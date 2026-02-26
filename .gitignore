@@ -1,0 +1,45 @@
+# Dependências
+node_modules/
+.dart_tool/
+.packages
+
+# Variáveis de ambiente (NUNCA compartilhar!)
+.env
+.env.local
+.env.development
+.env.production
+*.env
+
+# Chaves e credenciais Firebase
+*-firebase-adminsdk-*.json
+google-services.json
+GoogleService-Info.plist
+
+# Build
+backend/dist/
+frontend/build/
+frontend/.dart_tool/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Sistema operacional
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs
+*.log
+npm-debug.log*
+
+# Temporários
+tmp/
+temp/
+.cache/
+
+# Claude
+.claude/

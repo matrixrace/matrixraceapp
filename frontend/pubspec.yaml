@@ -1,0 +1,62 @@
+name: f1_predictions
+description: "Sistema de palpites para corridas de Fórmula 1"
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.10.4
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_web_plugins:
+    sdk: flutter
+
+  cupertino_icons: ^1.0.8
+
+  # Firebase
+  firebase_core: ^3.12.1
+  firebase_auth: ^5.5.1
+
+  # State Management
+  flutter_bloc: ^9.1.0
+  equatable: ^2.0.7
+
+  # HTTP & API
+  http: ^1.4.0
+
+  # Navigation
+  go_router: ^15.1.2
+
+  # Local Storage
+  shared_preferences: ^2.5.3
+
+  # UI/UX
+  google_fonts: ^6.2.1
+  cached_network_image: ^3.4.1
+  shimmer: ^3.0.0
+
+  # Utils
+  intl: ^0.20.2
+  logger: ^2.5.0
+  connectivity_plus: ^6.1.4
+  share_plus: ^11.0.0
+  url_launcher: ^6.3.1
+
+  # Chat em tempo real
+  socket_io_client: ^3.0.2
+
+  # Seleção de imagem para foto de perfil
+  image_picker: ^1.1.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/images/
+    - assets/icons/

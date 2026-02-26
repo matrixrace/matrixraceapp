@@ -1,0 +1,36 @@
+{
+  "name": "f1-predictions-backend",
+  "version": "1.0.0",
+  "description": "Backend do sistema de palpites de corridas de F1",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "nodemon src/index.js",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "node src/db/migrate.js",
+    "db:seed": "node scripts/seed.js",
+    "deploy:web": "cd ../frontend && flutter build web --release && cp -r build/web/. ../backend/public/"
+  },
+  "dependencies": {
+    "cloudinary": "^2.5.0",
+    "cors": "^2.8.5",
+    "date-fns": "^4.1.0",
+    "dotenv": "^16.4.5",
+    "drizzle-orm": "^0.36.0",
+    "express": "^4.21.0",
+    "express-rate-limit": "^7.4.0",
+    "firebase-admin": "^12.7.0",
+    "helmet": "^8.0.0",
+    "multer": "^1.4.5-lts.1",
+    "nodemailer": "^6.9.16",
+    "pg": "^8.13.0",
+    "socket.io": "^4.8.3",
+    "uuid": "^11.0.0",
+    "winston": "^3.17.0",
+    "zod": "^3.24.0"
+  },
+  "devDependencies": {
+    "drizzle-kit": "^0.28.0",
+    "nodemon": "^3.1.7"
+  }
+}
