@@ -3,7 +3,7 @@ const {
   getDashboardStats,
   getTeams, createTeam, updateTeam, deleteTeam, uploadTeamLogo,
   getDrivers, createDriver, updateDriver, deleteDriver, uploadDriverPhoto,
-  getRaces, createRace, updateRace, deleteRace,
+  getRaces, createRace, updateRace, deleteRace, syncRaceSchedule,
   createRaceResults, calculateScores,
   getOfficialLeagues, createOfficialLeague, updateOfficialLeague, deleteOfficialLeague, seedOfficialLeagues,
 } = require('../controllers/admin.controller');
@@ -43,6 +43,7 @@ router.post('/drivers/:id/photo', upload.single('photo'), uploadDriverPhoto);
 
 // Corridas
 router.get('/races', getRaces);
+router.post('/races/sync-schedule', syncRaceSchedule); // deve vir ANTES de /:id
 router.post('/races', validate(createRaceSchema), createRace);
 router.put('/races/:id', validate(updateRaceSchema), updateRace);
 router.delete('/races/:id', deleteRace);

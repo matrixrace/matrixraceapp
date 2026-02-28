@@ -18,6 +18,7 @@ import '../features/chat/presentation/screens/chat_screen.dart';
 import '../features/chat/presentation/screens/league_chat_screen.dart';
 import '../features/notifications/presentation/screens/notifications_screen.dart';
 import '../features/leagues/presentation/screens/league_detail_screen.dart';
+import '../features/f1results/presentation/screens/f1_results_screen.dart';
 
 /// Configuração de rotas do app
 class AppRouter {
@@ -53,6 +54,10 @@ class AppRouter {
           GoRoute(
             path: '/profile',
             builder: (context, state) => const ProfileScreen(),
+          ),
+          GoRoute(
+            path: '/f1-results',
+            builder: (context, state) => const F1ResultsScreen(),
           ),
         ],
       ),

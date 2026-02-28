@@ -19,7 +19,7 @@ class _HomeScreenState extends State<HomeScreen> {
   final ApiClient _api = ApiClient();
   List<dynamic> _upcomingRaces = [];
   bool _isLoading = true;
-  final Set<int> _predictedRaceIds = {}; // corridas onde o usuário já fez palpite
+  final Set<int> _predictedRaceIds = {};
   Timer? _countdownTimer;
 
   @override
@@ -27,7 +27,6 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     _loadUpcomingRaces();
     _loadMyPredictions();
-    // Atualiza o timer a cada segundo
     _countdownTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (mounted) setState(() {});
     });
@@ -39,7 +38,7 @@ class _HomeScreenState extends State<HomeScreen> {
     super.dispose();
   }
 
-  // Retorna o tempo restante até [target] como partes separadas
+  // Retorna o tempo restante até [target]
   ({int days, int hours, int minutes, int seconds, bool started}) _timeUntil(DateTime? target) {
     if (target == null) return (days: 0, hours: 0, minutes: 0, seconds: 0, started: true);
     final diff = target.difference(DateTime.now());
@@ -53,8 +52,27 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // Formata dois dígitos: 5 → "05"
   String _twoDigits(int n) => n.toString().padLeft(2, '0');
+
+  // Formata um DateTime como DD/MM/YYYY
+  String _fmtDate(DateTime dt) =>
+      '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}';
+
+  // Retorna "DD/MM/YYYY – DD/MM/YYYY" ou só uma data se a outra for nula
+  String _dateRange(DateTime? start, DateTime? end) {
+    if (start == null && end == null) return '';
+    if (start == null) return _fmtDate(end!);
+    if (end == null) return _fmtDate(start);
+    // Se mesma data, mostra só uma
+    if (start.year == end.year && start.month == end.month && start.day == end.day) {
+      return _fmtDate(start);
+    }
+    return '${_fmtDate(start)} – ${_fmtDate(end)}';
+  }
+
+  // Parseia datas do backend (suporta camelCase e snake_case)
+  DateTime? _parse(dynamic race, String camel, String snake) =>
+      DateTime.tryParse(race[camel] ?? race[snake] ?? '')?.toLocal();
 
   Future<void> _loadMyPredictions() async {
     final res = await _api.get('/predictions/me');
@@ -99,22 +117,13 @@ class _HomeScreenState extends State<HomeScreen> {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        // Próxima corrida
         if (_upcomingRaces.isNotEmpty) ...[
-          Text(
-            'Próxima Corrida',
-            style: Theme.of(context).textTheme.headlineMedium,
-          ),
+          Text('Próxima Corrida', style: Theme.of(context).textTheme.headlineMedium),
           const SizedBox(height: 12),
           _buildNextRaceCard(_upcomingRaces[0]),
           const SizedBox(height: 24),
         ],
-
-        // Calendário
-        Text(
-          'Calendário',
-          style: Theme.of(context).textTheme.titleLarge,
-        ),
+        Text('Calendário', style: Theme.of(context).textTheme.titleLarge),
         const SizedBox(height: 12),
         if (_upcomingRaces.isEmpty)
           const Card(
@@ -133,8 +142,9 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildNextRaceCard(dynamic race) {
-    final fp1Date = DateTime.tryParse(race['fp1_date'] ?? race['fp1Date'] ?? '');
-    final t = _timeUntil(fp1Date);
+    final fp1Date  = _parse(race, 'fp1Date',        'fp1_date');
+    final qualiDate = _parse(race, 'qualifyingDate', 'qualifying_date');
+    final raceDate  = _parse(race, 'raceDate',       'race_date');
 
     return Card(
       clipBehavior: Clip.antiAlias,
@@ -158,20 +168,17 @@ class _HomeScreenState extends State<HomeScreen> {
                 children: [
                   const Icon(Icons.flag, color: AppTheme.primaryRed),
                   const SizedBox(width: 8),
-                  Text(
-                    'Round ${race['round']}',
-                    style: const TextStyle(color: AppTheme.primaryRed),
-                  ),
+                  Text('Round ${race['round']}',
+                      style: const TextStyle(color: AppTheme.primaryRed)),
                 ],
               ),
               const SizedBox(height: 12),
-              Text(
-                race['name'] ?? '',
-                style: Theme.of(context).textTheme.headlineMedium,
-              ),
+              Text(race['name'] ?? '',
+                  style: Theme.of(context).textTheme.headlineMedium),
               const SizedBox(height: 4),
+              // Cidade + faixa de datas (TL1 → Corrida)
               Text(
-                '${race['location'] ?? ''} - ${race['country'] ?? ''}',
+                '${race['location'] ?? ''}  ·  ${_dateRange(fp1Date, raceDate)}',
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
               if (race['circuit_name'] != null || race['circuitName'] != null)
@@ -180,71 +187,20 @@ class _HomeScreenState extends State<HomeScreen> {
                   style: Theme.of(context).textTheme.bodyMedium,
                 ),
               const SizedBox(height: 16),
-              // Temporizador para o TL1
-              t.started
-                  ? Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: AppTheme.surfaceColor,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: const Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.timer_off, size: 14, color: AppTheme.textSecondary),
-                          SizedBox(width: 6),
-                          Text('TL1 já iniciado', style: TextStyle(color: AppTheme.textSecondary, fontSize: 13)),
-                        ],
-                      ),
-                    )
-                  : Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                      decoration: BoxDecoration(
-                        color: AppTheme.primaryRed.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: AppTheme.primaryRed.withValues(alpha: 0.4)),
-                      ),
-                      child: Column(
-                        children: [
-                          const Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(Icons.timer_outlined, size: 13, color: AppTheme.primaryRed),
-                              SizedBox(width: 4),
-                              Text('TL1 começa em', style: TextStyle(fontSize: 11, color: AppTheme.primaryRed)),
-                            ],
-                          ),
-                          const SizedBox(height: 6),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                            children: [
-                              _CountdownUnit(value: t.days, label: 'dias'),
-                              _CountdownSeparator(),
-                              _CountdownUnit(value: t.hours, label: 'horas'),
-                              _CountdownSeparator(),
-                              _CountdownUnit(value: t.minutes, label: 'min'),
-                              _CountdownSeparator(),
-                              _CountdownUnit(value: t.seconds, label: 'seg'),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
+              // Três temporizadores: TL1 / Qualificação / Corrida
+              _buildCountdownRows(fp1Date, qualiDate, raceDate),
               const SizedBox(height: 12),
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
                   onPressed: () {
+                    final raceId = race['id'] as int;
                     final authState = context.read<AuthBloc>().state;
-                    if (authState is AuthAuthenticated) {
-                      final raceId = race['id'] as int;
-                      if (_predictedRaceIds.contains(raceId)) {
-                        context.go('/predictions-view/$raceId');
-                      } else {
-                        context.go('/predictions/$raceId');
-                      }
+                    if (authState is AuthAuthenticated &&
+                        _predictedRaceIds.contains(raceId)) {
+                      context.go('/predictions-view/$raceId');
                     } else {
-                      context.go('/login');
+                      context.go('/predictions/$raceId');
                     }
                   },
                   icon: Icon(_predictedRaceIds.contains(race['id'] as int)
@@ -262,12 +218,69 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  /// Container com três linhas de countdown (TL1 / Qualificação / Corrida)
+  Widget _buildCountdownRows(DateTime? fp1, DateTime? quali, DateTime? race) {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppTheme.primaryRed.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppTheme.primaryRed.withValues(alpha: 0.3)),
+      ),
+      child: Column(
+        children: [
+          _countdownRow(Icons.timer_outlined, 'TL1', fp1),
+          const Divider(height: 1, indent: 12, endIndent: 12, color: Colors.white10),
+          _countdownRow(Icons.speed, 'Qualificação', quali),
+          const Divider(height: 1, indent: 12, endIndent: 12, color: Colors.white10),
+          _countdownRow(Icons.flag_outlined, 'Corrida', race),
+        ],
+      ),
+    );
+  }
+
+  Widget _countdownRow(IconData icon, String label, DateTime? target) {
+    final t = _timeUntil(target);
+    final started = t.started;
+    final color = started ? AppTheme.textSecondary : AppTheme.primaryRed;
+
+    String timerText;
+    if (started) {
+      timerText = 'em andamento';
+    } else if (t.days > 0) {
+      timerText = '${t.days}d ${_twoDigits(t.hours)}h ${_twoDigits(t.minutes)}m ${_twoDigits(t.seconds)}s';
+    } else {
+      timerText = '${_twoDigits(t.hours)}h ${_twoDigits(t.minutes)}m ${_twoDigits(t.seconds)}s';
+    }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+      child: Row(
+        children: [
+          Icon(icon, size: 13, color: color),
+          const SizedBox(width: 6),
+          Text(label,
+              style: TextStyle(
+                  fontSize: 12, color: color, fontWeight: FontWeight.w500)),
+          const Spacer(),
+          Text(
+            timerText,
+            style: TextStyle(
+              fontSize: 12,
+              color: color,
+              fontWeight: started ? FontWeight.normal : FontWeight.w600,
+              fontFeatures: started ? null : const [FontFeature.tabularFigures()],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildRaceListItem(dynamic race) {
-    final raceDate = DateTime.tryParse(race['race_date'] ?? race['raceDate'] ?? '');
-    final dateStr = raceDate != null
-        ? '${raceDate.day}/${raceDate.month}/${raceDate.year}'
-        : '';
-    final raceId = race['id'] as int;
+    final fp1Date  = _parse(race, 'fp1Date',  'fp1_date');
+    final raceDate = _parse(race, 'raceDate', 'race_date');
+    final dateStr  = _dateRange(fp1Date, raceDate);
+    final raceId   = race['id'] as int;
     final hasPrediction = _predictedRaceIds.contains(raceId);
 
     return Card(
@@ -278,10 +291,8 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             CircleAvatar(
               backgroundColor: AppTheme.surfaceColor,
-              child: Text(
-                '${race['round']}',
-                style: const TextStyle(color: AppTheme.primaryRed),
-              ),
+              child: Text('${race['round']}',
+                  style: const TextStyle(color: AppTheme.primaryRed)),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -290,8 +301,12 @@ class _HomeScreenState extends State<HomeScreen> {
                 children: [
                   Text(race['name'] ?? '',
                       style: const TextStyle(fontWeight: FontWeight.w600)),
-                  Text('${race['location'] ?? ''} - $dateStr',
-                      style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                  Text(
+                    dateStr.isNotEmpty
+                        ? '${race['location'] ?? ''} - $dateStr'
+                        : '${race['location'] ?? ''}',
+                    style: const TextStyle(fontSize: 12, color: Colors.grey),
+                  ),
                   const SizedBox(height: 4),
                   _buildCompactCountdown(race),
                 ],
@@ -313,20 +328,13 @@ class _HomeScreenState extends State<HomeScreen> {
                         style: TextStyle(fontSize: 12)),
                     style: TextButton.styleFrom(
                       foregroundColor: AppTheme.primaryRed,
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 4),
+                      padding:
+                          const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     ),
                   )
                 : IconButton(
                     icon: const Icon(Icons.chevron_right),
-                    onPressed: () {
-                      final authState = context.read<AuthBloc>().state;
-                      if (authState is AuthAuthenticated) {
-                        context.go('/predictions/$raceId');
-                      } else {
-                        context.go('/login');
-                      }
-                    },
+                    onPressed: () => context.go('/predictions/$raceId'),
                   ),
           ],
         ),
@@ -334,65 +342,35 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // Timer compacto para os itens da lista (uma linha)
+  /// Compact countdown: mostra apenas o próximo evento ainda não iniciado
   Widget _buildCompactCountdown(dynamic race) {
-    final fp1Date = DateTime.tryParse(race['fp1_date'] ?? race['fp1Date'] ?? '');
-    final t = _timeUntil(fp1Date);
-    if (t.started) {
-      return const Text('TL1 já iniciado',
-          style: TextStyle(fontSize: 11, color: AppTheme.textSecondary));
+    final sessions = [
+      ('TL1',         _parse(race, 'fp1Date',        'fp1_date'),        Icons.timer_outlined),
+      ('Qualificação', _parse(race, 'qualifyingDate', 'qualifying_date'), Icons.speed),
+      ('Corrida',     _parse(race, 'raceDate',        'race_date'),       Icons.flag_outlined),
+    ];
+
+    for (final (label, date, icon) in sessions) {
+      final t = _timeUntil(date);
+      if (!t.started) {
+        final text = t.days > 0
+            ? '${t.days}d ${_twoDigits(t.hours)}h ${_twoDigits(t.minutes)}m ${_twoDigits(t.seconds)}s'
+            : '${_twoDigits(t.hours)}h ${_twoDigits(t.minutes)}m ${_twoDigits(t.seconds)}s';
+        return Row(
+          children: [
+            Icon(icon, size: 11, color: AppTheme.primaryRed),
+            const SizedBox(width: 3),
+            Text('$label: $text',
+                style: const TextStyle(
+                    fontSize: 11,
+                    color: AppTheme.primaryRed,
+                    fontWeight: FontWeight.w500)),
+          ],
+        );
+      }
     }
-    final text = t.days > 0
-        ? '${t.days}d ${_twoDigits(t.hours)}h ${_twoDigits(t.minutes)}m ${_twoDigits(t.seconds)}s'
-        : '${_twoDigits(t.hours)}h ${_twoDigits(t.minutes)}m ${_twoDigits(t.seconds)}s';
-    return Row(
-      children: [
-        const Icon(Icons.timer_outlined, size: 11, color: AppTheme.primaryRed),
-        const SizedBox(width: 3),
-        Text('TL1: $text',
-            style: const TextStyle(fontSize: 11, color: AppTheme.primaryRed, fontWeight: FontWeight.w500)),
-      ],
-    );
+
+    return const SizedBox.shrink(); // todos já iniciados
   }
 }
 
-// ── Widgets auxiliares do countdown ─────────────────────────────────────────
-
-class _CountdownUnit extends StatelessWidget {
-  final int value;
-  final String label;
-  const _CountdownUnit({required this.value, required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Text(
-          value.toString().padLeft(2, '0'),
-          style: const TextStyle(
-            fontSize: 22,
-            fontWeight: FontWeight.bold,
-            color: AppTheme.primaryRed,
-            fontFeatures: [FontFeature.tabularFigures()],
-          ),
-        ),
-        Text(label,
-            style: const TextStyle(fontSize: 10, color: AppTheme.textSecondary)),
-      ],
-    );
-  }
-}
-
-class _CountdownSeparator extends StatelessWidget {
-  const _CountdownSeparator();
-
-  @override
-  Widget build(BuildContext context) {
-    return const Padding(
-      padding: EdgeInsets.only(bottom: 12),
-      child: Text(':',
-          style: TextStyle(
-              fontSize: 20, fontWeight: FontWeight.bold, color: AppTheme.primaryRed)),
-    );
-  }
-}

@@ -48,7 +48,8 @@ class _MainShellState extends State<MainShell> {
     final loc = GoRouterState.of(context).uri.path;
     if (loc.startsWith('/leagues')) return 1;
     if (loc.startsWith('/rankings')) return 2;
-    if (loc.startsWith('/profile')) return 3;
+    if (loc.startsWith('/f1-results')) return 3;
+    if (loc.startsWith('/profile')) return 4;
     return 0;
   }
 
@@ -128,6 +129,8 @@ class _MainShellState extends State<MainShell> {
                       context.read<AuthBloc>().add(AuthLogoutRequested());
                     } else if (value == 'admin') {
                       context.go('/admin');
+                    } else if (value == 'profile') {
+                      context.go('/profile');
                     }
                   },
                   itemBuilder: (context) => [
@@ -179,6 +182,8 @@ class _MainShellState extends State<MainShell> {
                 case 2:
                   context.go('/rankings');
                 case 3:
+                  context.go('/f1-results');
+                case 4:
                   context.go('/profile');
               }
             },
@@ -197,6 +202,11 @@ class _MainShellState extends State<MainShell> {
                 icon: Icon(Icons.leaderboard_outlined),
                 selectedIcon: Icon(Icons.leaderboard),
                 label: 'Ranking',
+              ),
+              NavigationDestination(
+                icon: Icon(Icons.emoji_events_outlined),
+                selectedIcon: Icon(Icons.emoji_events),
+                label: 'Histórico',
               ),
               NavigationDestination(
                 icon: Icon(Icons.person_outline),

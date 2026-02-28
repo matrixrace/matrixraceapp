@@ -184,7 +184,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
                       // País
                       DropdownButtonFormField<String>(
-                        value: _selectedCountry,
+                        initialValue: _selectedCountry,
                         decoration: const InputDecoration(
                           labelText: 'País',
                           prefixIcon: Icon(Icons.public_outlined),
@@ -205,7 +205,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       // Estado
                       if (_selectedCountry == 'Brasil')
                         DropdownButtonFormField<String>(
-                          value: _selectedState,
+                          initialValue: _selectedState,
                           decoration: const InputDecoration(
                             labelText: 'Estado',
                             prefixIcon: Icon(Icons.map_outlined),

@@ -4,6 +4,7 @@ const { eq, and } = require('drizzle-orm');
 const { successResponse, errorResponse } = require('../utils/helpers');
 const { uploadImage, deleteImage } = require('../services/storage.service');
 const { calculateRaceScores } = require('../services/scoring.service');
+const { fetchJolpica } = require('../utils/jolpica');
 const logger = require('../utils/logger');
 
 // ==================
@@ -48,8 +49,44 @@ async function getDashboardStats(req, res, next) {
 // GET /api/v1/admin/teams
 async function getTeams(req, res, next) {
   try {
-    const allTeams = await db.select().from(teams).orderBy(teams.name);
-    res.json(successResponse(allTeams));
+    const teamsResult = await pool.query(
+      `SELECT id, name, logo_url, color_primary, color_primary AS color,
+              color_secondary, created_at, updated_at
+       FROM teams
+       ORDER BY name`
+    );
+
+    const driversResult = await pool.query(
+      `SELECT id, team_id, first_name, last_name, photo_url, number
+       FROM drivers
+       WHERE is_active = true
+       ORDER BY last_name`
+    );
+
+    logger.info(`[getTeams] teams=${teamsResult.rows.length} drivers=${driversResult.rows.length}`);
+    if (driversResult.rows.length > 0) {
+      const sample = driversResult.rows[0];
+      logger.info(`[getTeams] driver sample: id=${sample.id} team_id=${sample.team_id} name=${sample.first_name} is_active type=${typeof sample.is_active}`);
+    }
+
+    // Agrupa pilotos por equipe
+    const byTeam = {};
+    for (const d of driversResult.rows) {
+      if (d.team_id != null) {
+        if (!byTeam[d.team_id]) byTeam[d.team_id] = [];
+        byTeam[d.team_id].push(d);
+      }
+    }
+
+    logger.info(`[getTeams] byTeam keys: ${JSON.stringify(Object.keys(byTeam))}`);
+
+    const rows = teamsResult.rows.map(row => ({
+      ...row,
+      driver_count: (byTeam[row.id] || []).length,
+      team_drivers: byTeam[row.id] || [],
+    }));
+
+    res.json(successResponse(rows));
   } catch (error) {
     next(error);
   }
@@ -263,7 +300,9 @@ async function updateRace(req, res, next) {
   try {
     const { id } = req.params;
     const data = { ...req.body, updatedAt: new Date() };
-    if (data.raceDate) data.raceDate = new Date(data.raceDate);
+    if (data.raceDate)       data.raceDate       = new Date(data.raceDate);
+    if (data.fp1Date)        data.fp1Date        = new Date(data.fp1Date);
+    if (data.qualifyingDate) data.qualifyingDate = new Date(data.qualifyingDate);
 
     const [race] = await db
       .update(races)
@@ -529,6 +568,57 @@ async function seedOfficialLeagues(req, res, next) {
   }
 }
 
+// POST /api/v1/admin/races/sync-schedule?year=2026
+// Busca o calendário oficial da Jolpica e atualiza fp1_date, qualifying_date, race_date de cada GP
+async function syncRaceSchedule(req, res, next) {
+  try {
+    const year = parseInt(req.query.year) || new Date().getFullYear();
+
+    const data = await fetchJolpica(`https://api.jolpi.ca/ergast/f1/${year}.json`);
+    const jolpicaRaces = data.MRData?.RaceTable?.Races || [];
+
+    if (jolpicaRaces.length === 0) {
+      return res.status(404).json(errorResponse(`Nenhuma corrida encontrada na Jolpica para ${year}`));
+    }
+
+    let updated = 0;
+    let notFound = 0;
+
+    for (const jr of jolpicaRaces) {
+      const round = parseInt(jr.round);
+
+      // Combina date (YYYY-MM-DD) + time (HH:MM:SSZ) → Date UTC
+      const toUTC = (dateStr, timeStr) =>
+        dateStr && timeStr ? new Date(`${dateStr}T${timeStr}`) : null;
+
+      const fp1Date        = toUTC(jr.FirstPractice?.date, jr.FirstPractice?.time);
+      const qualifyingDate = toUTC(jr.Qualifying?.date,    jr.Qualifying?.time);
+      const raceDate       = toUTC(jr.date,                jr.time);
+
+      if (!raceDate) continue;
+
+      const result = await pool.query(
+        `UPDATE races
+         SET fp1_date = $1, qualifying_date = $2, race_date = $3, updated_at = NOW()
+         WHERE season = $4 AND round = $5
+         RETURNING id`,
+        [fp1Date, qualifyingDate, raceDate, year, round]
+      );
+
+      if (result.rowCount > 0) updated++;
+      else notFound++;
+    }
+
+    logger.info(`Sync schedule ${year}: ${updated} atualizadas, ${notFound} não encontradas no DB`);
+    res.json(successResponse(
+      { year, updated, notFound },
+      `${updated} corridas sincronizadas com horários oficiais da F1`
+    ));
+  } catch (error) {
+    next(error);
+  }
+}
+
 module.exports = {
   // Dashboard
   getDashboardStats,
@@ -537,7 +627,7 @@ module.exports = {
   // Drivers
   getDrivers, createDriver, updateDriver, deleteDriver, uploadDriverPhoto,
   // Races
-  getRaces, createRace, updateRace, deleteRace,
+  getRaces, createRace, updateRace, deleteRace, syncRaceSchedule,
   // Results
   createRaceResults, calculateScores,
   // Official Leagues

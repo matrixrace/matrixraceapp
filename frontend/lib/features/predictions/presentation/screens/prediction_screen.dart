@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/network/api_client.dart';
+import '../../../auth/presentation/bloc/auth_bloc.dart';
 
 /// Tela de Palpite - 3 passos:
 /// Passo 1: Ordenar os 22 pilotos
@@ -43,6 +45,10 @@ class _PredictionScreenState extends State<PredictionScreen> {
 
   String? _savedLockType;
 
+  // Ordenação rápida
+  bool _isLoadingQuickOrder = false;
+  bool _hasPreviousPrediction = false;
+
   @override
   void initState() {
     super.initState();
@@ -58,6 +64,7 @@ class _PredictionScreenState extends State<PredictionScreen> {
     final myPredRes = await _api.get('/predictions/race/${widget.raceId}');
     final officialLeagueRes = await _api.get('/races/${widget.raceId}/official-league');
     final publicLeaguesRes = await _api.get('/leagues/public-for-prediction?raceId=${widget.raceId}');
+    final allPredsRes = await _api.get('/predictions/me');
 
     if (mounted) {
       setState(() {
@@ -119,9 +126,128 @@ class _PredictionScreenState extends State<PredictionScreen> {
           }
         }
 
+        // Verifica se usuário tem palpite anterior (para habilitar "Último Palpite")
+        if (allPredsRes.success && allPredsRes.data != null) {
+          final allPreds = allPredsRes.data as List;
+          _hasPreviousPrediction = allPreds.any(
+            (p) => p['race_id'].toString() != widget.raceId,
+          );
+        }
+
         _isLoading = false;
       });
     }
+  }
+
+  // ── Ordenação Rápida ───────────────────────────────────────────
+  Future<void> _applyQuickOrder(String type) async {
+    setState(() => _isLoadingQuickOrder = true);
+
+    final res = await _api.get(
+      '/predictions/quick-order?raceId=${widget.raceId}&type=$type',
+    );
+
+    if (!mounted) return;
+    setState(() => _isLoadingQuickOrder = false);
+
+    if (!res.success || res.data == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(res.message.isNotEmpty ? res.message : 'Erro ao carregar ordem'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    final orderedIds = (res.data['orderedDriverIds'] as List? ?? [])
+        .map((e) => e as int)
+        .toList();
+
+    if (orderedIds.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Nenhum dado disponível para este GP')),
+      );
+      return;
+    }
+
+    setState(() {
+      final reordered = <dynamic>[];
+      for (final id in orderedIds) {
+        final driver = _drivers.firstWhere(
+          (d) => d['id'] == id,
+          orElse: () => null,
+        );
+        if (driver != null) reordered.add(driver);
+      }
+      // Pilotos não cobertos ficam no final
+      for (final d in _drivers) {
+        if (!reordered.any((r) => r['id'] == d['id'])) reordered.add(d);
+      }
+      _drivers = reordered;
+    });
+  }
+
+  Widget _buildQuickOrderButtons() {
+    final isRound1 = (_race?['round'] as int? ?? 1) == 1;
+
+    return Container(
+      color: AppTheme.cardBackground,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      child: _isLoadingQuickOrder
+          ? const Center(
+              child: SizedBox(
+                height: 32,
+                width: 32,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            )
+          : Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                const Text(
+                  'Autocompletar',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: Colors.white38,
+                    fontWeight: FontWeight.w500,
+                    letterSpacing: 0.3,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Wrap(
+                    spacing: 8,
+                    runSpacing: 6,
+                    children: [
+                      _QuickBtn(
+                        'Última Corrida',
+                        Icons.history,
+                        onTap: isRound1 ? null : () => _applyQuickOrder('last-race'),
+                      ),
+                      _QuickBtn(
+                        'Campeonato',
+                        Icons.military_tech,
+                        onTap: isRound1 ? null : () => _applyQuickOrder('standings'),
+                      ),
+                      _QuickBtn(
+                        'Último Palpite',
+                        Icons.bookmark_outline,
+                        onTap: _hasPreviousPrediction
+                            ? () => _applyQuickOrder('last-prediction')
+                            : null,
+                      ),
+                      _QuickBtn(
+                        'Por IA',
+                        Icons.auto_awesome,
+                        onTap: null, // desabilitado — futuro
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+    );
   }
 
   DateTime? _parseDate(dynamic value) {
@@ -303,6 +429,7 @@ class _PredictionScreenState extends State<PredictionScreen> {
   Widget _buildStep1Drivers() {
     return Column(
       children: [
+        _buildQuickOrderButtons(),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
           color: AppTheme.primaryRed.withValues(alpha: 0.1),
@@ -748,10 +875,43 @@ class _PredictionScreenState extends State<PredictionScreen> {
     if (_currentStep == 1) {
       setState(() => _currentStep = 2);
     } else if (_currentStep == 2) {
-      _savePrediction();
+      final authState = context.read<AuthBloc>().state;
+      if (authState is! AuthAuthenticated) {
+        _showAuthRequiredDialog();
+      } else {
+        _savePrediction();
+      }
     } else {
       _applyToLeagues();
     }
+  }
+
+  void _showAuthRequiredDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Entre para salvar'),
+        content: const Text(
+          'Para salvar seu palpite e aplicá-lo em ligas, você precisa ter uma conta.',
+        ),
+        actions: [
+          OutlinedButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              context.go('/register');
+            },
+            child: const Text('Fazer Cadastro'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              context.go('/login');
+            },
+            child: const Text('Fazer Login'),
+          ),
+        ],
+      ),
+    );
   }
 
   String _lockTypeLabel(String type) {
@@ -807,5 +967,54 @@ class _PredictionScreenState extends State<PredictionScreen> {
     } catch (_) {
       return Colors.grey;
     }
+  }
+}
+
+// ── Botão de Ordenação Rápida ─────────────────────────────────────────────────
+class _QuickBtn extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final VoidCallback? onTap; // null = desabilitado
+
+  const _QuickBtn(this.label, this.icon, {required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final enabled = onTap != null;
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: enabled
+              ? AppTheme.surfaceColor
+              : AppTheme.surfaceColor.withValues(alpha: 0.4),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: enabled
+                ? AppTheme.primaryRed.withValues(alpha: 0.5)
+                : Colors.white12,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 14,
+              color: enabled ? AppTheme.primaryRed : Colors.white24,
+            ),
+            const SizedBox(width: 5),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                color: enabled ? Colors.white70 : Colors.white24,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

@@ -219,7 +219,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
                     // País
                     DropdownButtonFormField<String>(
-                      value: _selectedCountry,
+                      initialValue: _selectedCountry,
                       decoration: const InputDecoration(
                         labelText: 'País',
                         prefixIcon: Icon(Icons.public_outlined),
@@ -240,7 +240,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     // Estado (dropdown para Brasil, texto livre para outros)
                     if (_selectedCountry == 'Brasil')
                       DropdownButtonFormField<String>(
-                        value: _selectedState,
+                        initialValue: _selectedState,
                         decoration: const InputDecoration(
                           labelText: 'Estado',
                           prefixIcon: Icon(Icons.map_outlined),

@@ -21,6 +21,7 @@ const usersRoutes = require('./routes/users.routes');
 const friendsRoutes = require('./routes/friends.routes');
 const messagesRoutes = require('./routes/messages.routes');
 const notificationsRoutes = require('./routes/notifications.routes');
+const f1ResultsRoutes = require('./routes/f1results.routes');
 
 // Cria o app Express e o servidor HTTP (necessário para Socket.io)
 const app = express();
@@ -95,6 +96,7 @@ app.use('/api/v1/users', usersRoutes);
 app.use('/api/v1/friends', friendsRoutes);
 app.use('/api/v1/messages', messagesRoutes);
 app.use('/api/v1/notifications', notificationsRoutes);
+app.use('/api/v1/f1-results', f1ResultsRoutes);
 
 // ==================
 // FRONTEND (Flutter Web)

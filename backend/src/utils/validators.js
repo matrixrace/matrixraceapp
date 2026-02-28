@@ -39,6 +39,8 @@ const createRaceSchema = z.object({
   location: z.string().min(1, 'Local é obrigatório').max(100),
   country: z.string().length(3, 'País deve ter 3 letras (ISO)').optional(),
   circuitName: z.string().max(100).optional(),
+  fp1Date: z.string().refine((v) => !isNaN(Date.parse(v)), 'Data FP1 inválida').optional(),
+  qualifyingDate: z.string().refine((v) => !isNaN(Date.parse(v)), 'Data Quali inválida').optional(),
   raceDate: z.string().refine((val) => !isNaN(Date.parse(val)), 'Data inválida'),
   season: z.number().int().min(2024).max(2100),
   round: z.number().int().min(1).max(50),

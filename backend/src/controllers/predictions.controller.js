@@ -3,6 +3,7 @@ const { predictions, predictionApplications, races, leagueMembers, leagueRaces }
 const { eq, and } = require('drizzle-orm');
 const { successResponse, errorResponse } = require('../utils/helpers');
 const logger = require('../utils/logger');
+const { fetchJolpica } = require('../utils/jolpica');
 
 // Mapeia lock_type para max_points_per_driver
 const LOCK_TYPE_POINTS = {
@@ -369,6 +370,168 @@ async function deletePrediction(req, res, next) {
   }
 }
 
+// ── Quick Order ───────────────────────────────────────────────────────────────
+
+// GET /api/v1/predictions/quick-order?raceId={id}&type={last-race|standings|last-prediction}
+// Retorna uma ordem sugerida de pilotos para pré-preencher o palpite
+async function getQuickOrder(req, res, next) {
+  try {
+    const raceId = parseInt(req.query.raceId);
+    const type = req.query.type;
+
+    if (!raceId || !type) {
+      return res.status(400).json(errorResponse('Parâmetros raceId e type são obrigatórios'));
+    }
+
+    // Busca dados da corrida atual
+    const raceRow = await pool.query('SELECT * FROM races WHERE id = $1', [raceId]);
+    if (raceRow.rows.length === 0) {
+      return res.status(404).json(errorResponse('Corrida não encontrada'));
+    }
+    const race = raceRow.rows[0];
+
+    // Busca todos pilotos ativos (para completar posições não cobertas no final)
+    const driversRow = await pool.query(
+      'SELECT id, last_name FROM drivers WHERE is_active = true ORDER BY id'
+    );
+    const allDrivers = driversRow.rows;
+
+    let orderedDriverIds = [];
+
+    if (type === 'last-race') {
+      orderedDriverIds = await _getLastRaceOrder(race, allDrivers);
+    } else if (type === 'standings') {
+      orderedDriverIds = await _getStandingsOrder(race, allDrivers);
+    } else if (type === 'last-prediction') {
+      orderedDriverIds = await _getLastPredictionOrder(race, req.user.id);
+      if (orderedDriverIds.length === 0) {
+        return res.json(successResponse({ orderedDriverIds: [], hasData: false }));
+      }
+    } else {
+      return res.status(400).json(errorResponse('Tipo inválido'));
+    }
+
+    // Adiciona pilotos ativos não cobertos ao final (ex: pilotos novos)
+    const covered = new Set(orderedDriverIds);
+    const remaining = allDrivers.map((d) => d.id).filter((id) => !covered.has(id));
+
+    res.json(successResponse({
+      orderedDriverIds: [...orderedDriverIds, ...remaining],
+      hasData: true,
+    }));
+  } catch (error) {
+    next(error);
+  }
+}
+
+// Retorna IDs de pilotos ordenados conforme resultado da corrida anterior
+async function _getLastRaceOrder(race, allDrivers) {
+  const prevSeason = race.round > 1 ? race.season : race.season - 1;
+  const prevRound = race.round > 1 ? race.round - 1 : null;
+
+  let prevRaceId = null;
+
+  if (prevRound) {
+    const r = await pool.query(
+      'SELECT id FROM races WHERE season = $1 AND round = $2',
+      [prevSeason, prevRound]
+    );
+    prevRaceId = r.rows[0]?.id ?? null;
+  } else {
+    // Última corrida do ano anterior (round mais alto)
+    const r = await pool.query(
+      'SELECT id FROM races WHERE season = $1 ORDER BY round DESC LIMIT 1',
+      [prevSeason]
+    );
+    prevRaceId = r.rows[0]?.id ?? null;
+  }
+
+  // Tenta usar dados do DB (admin já inseriu o resultado)
+  if (prevRaceId) {
+    const dbRes = await pool.query(
+      'SELECT driver_id FROM race_results WHERE race_id = $1 ORDER BY position',
+      [prevRaceId]
+    );
+    if (dbRes.rows.length > 0) {
+      return dbRes.rows.map((r) => r.driver_id);
+    }
+  }
+
+  // Fallback: busca no Jolpica
+  // Descobre o round da corrida anterior pelo DB ou usa 1 como fallback
+  let jolpicaRound = prevRound;
+  if (!jolpicaRound) {
+    const r = await pool.query(
+      'SELECT round FROM races WHERE season = $1 ORDER BY round DESC LIMIT 1',
+      [prevSeason]
+    );
+    jolpicaRound = r.rows[0]?.round ?? 1;
+  }
+
+  try {
+    const data = await fetchJolpica(
+      `https://api.jolpi.ca/ergast/f1/${prevSeason}/${jolpicaRound}/results.json?limit=30`
+    );
+    const results = data.MRData?.RaceTable?.Races?.[0]?.Results || [];
+    return _mapJolpicaResultsToIds(results, allDrivers);
+  } catch (_) {
+    return [];
+  }
+}
+
+// Retorna IDs de pilotos ordenados conforme classificação do campeonato
+async function _getStandingsOrder(race, allDrivers) {
+  const season = race.round > 1 ? race.season : race.season - 1;
+  const round = race.round > 1 ? race.round - 1 : null;
+
+  const url = round
+    ? `https://api.jolpi.ca/ergast/f1/${season}/${round}/driverStandings.json`
+    : `https://api.jolpi.ca/ergast/f1/${season}/driverStandings.json`;
+
+  try {
+    const data = await fetchJolpica(url);
+    const standings =
+      data.MRData?.StandingsTable?.StandingsLists?.[0]?.DriverStandings || [];
+
+    return standings
+      .map((s) => {
+        const familyName = s.Driver.familyName.toLowerCase();
+        return allDrivers.find((d) => d.last_name.toLowerCase() === familyName)?.id;
+      })
+      .filter(Boolean);
+  } catch (_) {
+    return [];
+  }
+}
+
+// Retorna IDs de pilotos conforme o último palpite do usuário antes desta corrida
+async function _getLastPredictionOrder(race, userId) {
+  const result = await pool.query(
+    `SELECT p.driver_id
+     FROM predictions p
+     JOIN races r ON r.id = p.race_id
+     WHERE p.user_id = $1
+       AND r.race_date < (SELECT race_date FROM races WHERE id = $2)
+     ORDER BY r.race_date DESC, p.predicted_position ASC
+     LIMIT 30`,
+    [userId, race.id]
+  );
+
+  return result.rows.map((r) => r.driver_id);
+}
+
+// Mapeia resultados do Jolpica para IDs de pilotos do nosso DB, por sobrenome
+function _mapJolpicaResultsToIds(results, allDrivers) {
+  return results
+    .sort((a, b) => parseInt(a.position) - parseInt(b.position))
+    .map((r) => {
+      const familyName = r.Driver?.familyName?.toLowerCase();
+      if (!familyName) return null;
+      return allDrivers.find((d) => d.last_name.toLowerCase() === familyName)?.id;
+    })
+    .filter(Boolean);
+}
+
 module.exports = {
   createPrediction,
   applyPredictionToLeagues,
@@ -376,4 +539,5 @@ module.exports = {
   getRacePredictions,
   getMyPredictions,
   deletePrediction,
+  getQuickOrder,
 };
