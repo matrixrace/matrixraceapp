@@ -22,13 +22,6 @@ async function migrate() {
     await client.query('CREATE EXTENSION IF NOT EXISTS "uuid-ossp";');
     console.log('✓ Extensão uuid-ossp habilitada');
 
-    // Adiciona colunas de localização ao usuário (se não existirem)
-    await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS bio TEXT`);
-    await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS country VARCHAR(100)`);
-    await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS state   VARCHAR(100)`);
-    await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS city    VARCHAR(100)`);
-    console.log('✓ Colunas bio/country/state/city garantidas em users');
-
     // Tabela de usuários
     await client.query(`
       CREATE TABLE IF NOT EXISTS users (
@@ -43,6 +36,13 @@ async function migrate() {
       );
     `);
     console.log('✓ Tabela users criada');
+
+    // Adiciona colunas de localização ao usuário (se não existirem)
+    await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS bio TEXT`);
+    await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS country VARCHAR(100)`);
+    await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS state   VARCHAR(100)`);
+    await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS city    VARCHAR(100)`);
+    console.log('✓ Colunas bio/country/state/city garantidas em users');
 
     // Tabela de equipes
     await client.query(`
