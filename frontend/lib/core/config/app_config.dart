@@ -3,7 +3,7 @@ class AppConfig {
   // URL da API do backend
   // Em desenvolvimento: http://localhost:3000
   // Em produção: trocar para URL do Railway
-  static const String apiBaseUrl = 'https://matrixraceapp-production.up.railway.app/api/v1';
+  static const String apiBaseUrl = 'https://www.matrixrace.com/api/v1';
 
   // Nome do app
   static const String appName = 'F1 Predictions';
