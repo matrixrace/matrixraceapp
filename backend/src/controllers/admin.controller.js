@@ -611,7 +611,7 @@ async function syncRaceSchedule(req, res, next) {
         [
           jr.raceName,
           jr.Circuit?.circuitName || jr.raceName,
-          jr.Circuit?.Location?.country || '',
+          (jr.Circuit?.Location?.country || '').substring(0, 3).toUpperCase(),
           jr.Circuit?.circuitName || '',
           fp1Date,
           qualifyingDate,
