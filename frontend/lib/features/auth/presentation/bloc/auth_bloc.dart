@@ -42,6 +42,8 @@ class AuthRegisterRequested extends AuthEvent {
 
 class AuthLogoutRequested extends AuthEvent {}
 
+class AuthGoogleLoginRequested extends AuthEvent {}
+
 // ==================
 // ESTADOS (como está)
 // ==================
@@ -82,6 +84,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     on<AuthLoginRequested>(_onLogin);
     on<AuthRegisterRequested>(_onRegister);
     on<AuthLogoutRequested>(_onLogout);
+    on<AuthGoogleLoginRequested>(_onGoogleLogin);
   }
 
   // Verifica se já está logado
@@ -157,6 +160,32 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   ) async {
     await _firebaseAuth.signOut();
     emit(AuthUnauthenticated());
+  }
+
+  // Login com Google (popup — Flutter Web)
+  Future<void> _onGoogleLogin(
+    AuthGoogleLoginRequested event,
+    Emitter<AuthState> emit,
+  ) async {
+    emit(AuthLoading());
+    try {
+      final provider = GoogleAuthProvider();
+      final credential = await _firebaseAuth.signInWithPopup(provider);
+      final user = credential.user!;
+
+      // Upsert no banco de dados (cria se não existir)
+      await _apiClient.post('/auth/register', body: {
+        'firebaseUid': user.uid,
+        'email': user.email ?? '',
+        'displayName': user.displayName ?? user.email?.split('@').first ?? 'Usuário',
+      });
+
+      emit(AuthAuthenticated(user));
+    } on FirebaseAuthException catch (e) {
+      emit(AuthError(_getFirebaseErrorMessage(e.code)));
+    } catch (e) {
+      emit(AuthError('Erro ao fazer login com Google: $e'));
+    }
   }
 
   // Converte erros do Firebase para mensagens em português

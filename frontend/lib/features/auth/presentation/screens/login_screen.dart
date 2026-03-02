@@ -34,6 +34,10 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  void _onGoogleLogin() {
+    context.read<AuthBloc>().add(AuthGoogleLoginRequested());
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -169,6 +173,63 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                       const SizedBox(height: 20),
 
+                      // ── Separador "ou" ────────────────────────────────
+                      BlocBuilder<AuthBloc, AuthState>(
+                        builder: (context, state) {
+                          final isLoading = state is AuthLoading;
+                          return Column(
+                            children: [
+                              Row(
+                                children: [
+                                  const Expanded(child: Divider()),
+                                  Padding(
+                                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                                    child: Text(
+                                      'ou',
+                                      style: TextStyle(color: AppTheme.textSecondary),
+                                    ),
+                                  ),
+                                  const Expanded(child: Divider()),
+                                ],
+                              ),
+                              const SizedBox(height: 16),
+
+                              // ── Botão Google ──────────────────────────
+                              SizedBox(
+                                height: 52,
+                                width: double.infinity,
+                                child: OutlinedButton(
+                                  onPressed: isLoading ? null : _onGoogleLogin,
+                                  style: OutlinedButton.styleFrom(
+                                    backgroundColor: Colors.white,
+                                    foregroundColor: const Color(0xFF3C4043),
+                                    side: const BorderSide(color: Color(0xFFDADCE0)),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                  ),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      const _GoogleLogo(),
+                                      const SizedBox(width: 12),
+                                      const Text(
+                                        'Continuar com Google',
+                                        style: TextStyle(
+                                          fontSize: 15,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          );
+                        },
+                      ),
+                      const SizedBox(height: 20),
+
                       // ── Link Cadastro ─────────────────────────────────
                       Center(
                         child: TextButton(
@@ -197,6 +258,28 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Logo do Google feito com texto colorido (sem dependência de imagem)
+class _GoogleLogo extends StatelessWidget {
+  const _GoogleLogo();
+
+  @override
+  Widget build(BuildContext context) {
+    return RichText(
+      text: const TextSpan(
+        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+        children: [
+          TextSpan(text: 'G', style: TextStyle(color: Color(0xFF4285F4))),
+          TextSpan(text: 'o', style: TextStyle(color: Color(0xFFEA4335))),
+          TextSpan(text: 'o', style: TextStyle(color: Color(0xFFFBBC05))),
+          TextSpan(text: 'g', style: TextStyle(color: Color(0xFF4285F4))),
+          TextSpan(text: 'l', style: TextStyle(color: Color(0xFF34A853))),
+          TextSpan(text: 'e', style: TextStyle(color: Color(0xFFEA4335))),
+        ],
       ),
     );
   }
