@@ -1,4 +1,5 @@
 const http = require('http');
+const https = require('https');
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -97,6 +98,31 @@ app.use('/api/v1/friends', friendsRoutes);
 app.use('/api/v1/messages', messagesRoutes);
 app.use('/api/v1/notifications', notificationsRoutes);
 app.use('/api/v1/f1-results', f1ResultsRoutes);
+
+// ==================
+// PROXY: Firebase Auth Handler (necessário para custom authDomain)
+// Quando authDomain = www.matrixrace.com, o Firebase SDK tenta carregar
+// https://www.matrixrace.com/__/auth/handler — este proxy repassa para o Firebase
+// ==================
+app.use('/__/auth', (req, res) => {
+  const firebaseHost = 'matrixapp-v3.firebaseapp.com';
+  const targetPath = `/__/auth${req.path}${req.url.includes('?') ? req.url.substring(req.url.indexOf('?')) : ''}`;
+
+  const options = {
+    hostname: firebaseHost,
+    path: targetPath,
+    method: req.method,
+    headers: { ...req.headers, host: firebaseHost },
+  };
+
+  const proxyReq = https.request(options, (proxyRes) => {
+    res.writeHead(proxyRes.statusCode, proxyRes.headers);
+    proxyRes.pipe(res, { end: true });
+  });
+
+  proxyReq.on('error', () => res.status(502).send('Firebase proxy error'));
+  req.pipe(proxyReq, { end: true });
+});
 
 // ==================
 // FRONTEND (Flutter Web)

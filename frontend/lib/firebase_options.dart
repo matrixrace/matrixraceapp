@@ -26,7 +26,7 @@ class DefaultFirebaseOptions {
     appId: '1:596396881340:web:b683f39fe90c87c2e8a7b9',
     messagingSenderId: '596396881340',
     projectId: 'matrixapp-v3',
-    authDomain: 'matrixapp-v3.firebaseapp.com',
+    authDomain: 'www.matrixrace.com',
     storageBucket: 'matrixapp-v3.firebasestorage.app',
     measurementId: 'G-1PNY697T19',
   );
