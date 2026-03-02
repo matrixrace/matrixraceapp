@@ -1,4 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:http/http.dart' as http;
+import 'package:image_picker/image_picker.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import '../../../../core/config/app_config.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/app_theme.dart';
 
@@ -81,8 +86,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   String? _selectedCountry;
   String? _selectedState;
+  String? _avatarUrl;
   bool _isLoading = false;
   bool _isSaving = false;
+  bool _isUploadingAvatar = false;
 
   @override
   void initState() {
@@ -112,6 +119,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       final savedState = data['state'] as String?;
 
       setState(() {
+        _avatarUrl = data['avatarUrl'] as String?;
         _selectedCountry = _kCountries.contains(savedCountry) ? savedCountry : null;
 
         if (savedCountry == 'Brasil') {
@@ -123,6 +131,67 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       });
     }
     setState(() => _isLoading = false);
+  }
+
+  Future<void> _pickAndUploadAvatar() async {
+    final messenger = ScaffoldMessenger.of(context);
+    final picker = ImagePicker();
+    final picked = await picker.pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 600,
+      maxHeight: 600,
+      imageQuality: 85,
+    );
+    if (picked == null || !mounted) return;
+
+    setState(() => _isUploadingAvatar = true);
+
+    try {
+      final bytes = await picked.readAsBytes();
+      final token = await FirebaseAuth.instance.currentUser?.getIdToken();
+      if (token == null) throw Exception('Não autenticado');
+
+      const baseUrl = AppConfig.apiBaseUrl;
+
+      final request = http.MultipartRequest(
+        'POST',
+        Uri.parse('$baseUrl/auth/me/avatar'),
+      );
+      request.headers['Authorization'] = 'Bearer $token';
+      request.files.add(http.MultipartFile.fromBytes(
+        'avatar',
+        bytes,
+        filename: 'avatar.jpg',
+      ));
+
+      final streamed = await request.send();
+      final response = await http.Response.fromStream(streamed);
+
+      if (!mounted) return;
+
+      if (response.statusCode == 200) {
+        // Recarrega o perfil para obter a nova URL
+        final res = await _api.get('/auth/me');
+        if (mounted && res.success && res.data != null) {
+          setState(() {
+            _avatarUrl = (res.data as Map<String, dynamic>)['avatarUrl'] as String?;
+          });
+        }
+        messenger.showSnackBar(const SnackBar(content: Text('Foto atualizada!')));
+      } else {
+        messenger.showSnackBar(
+          const SnackBar(content: Text('Erro ao fazer upload da foto')),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Erro ao selecionar a imagem')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isUploadingAvatar = false);
+    }
   }
 
   Future<void> _save() async {
@@ -171,19 +240,52 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    // Avatar (apenas visual)
+                    // Avatar com botão de câmera
                     Center(
-                      child: CircleAvatar(
-                        radius: 44,
-                        backgroundColor: AppTheme.surfaceColor,
-                        child: Text(
-                          _nameController.text.isNotEmpty
-                              ? _nameController.text[0].toUpperCase()
-                              : '?',
-                          style: const TextStyle(
-                              fontSize: 36,
-                              fontWeight: FontWeight.bold,
-                              color: AppTheme.primaryRed),
+                      child: GestureDetector(
+                        onTap: _isUploadingAvatar ? null : _pickAndUploadAvatar,
+                        child: Stack(
+                          children: [
+                            CircleAvatar(
+                              radius: 44,
+                              backgroundColor: AppTheme.surfaceColor,
+                              backgroundImage: _avatarUrl != null && _avatarUrl!.isNotEmpty
+                                  ? CachedNetworkImageProvider(_avatarUrl!)
+                                  : null,
+                              child: _isUploadingAvatar
+                                  ? const SizedBox(
+                                      width: 28,
+                                      height: 28,
+                                      child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          color: AppTheme.primaryRed),
+                                    )
+                                  : (_avatarUrl == null || _avatarUrl!.isEmpty)
+                                      ? Text(
+                                          _nameController.text.isNotEmpty
+                                              ? _nameController.text[0].toUpperCase()
+                                              : '?',
+                                          style: const TextStyle(
+                                              fontSize: 36,
+                                              fontWeight: FontWeight.bold,
+                                              color: AppTheme.primaryRed),
+                                        )
+                                      : null,
+                            ),
+                            Positioned(
+                              bottom: 0,
+                              right: 0,
+                              child: Container(
+                                padding: const EdgeInsets.all(6),
+                                decoration: const BoxDecoration(
+                                  color: AppTheme.primaryRed,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(Icons.camera_alt,
+                                    size: 14, color: Colors.white),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ),

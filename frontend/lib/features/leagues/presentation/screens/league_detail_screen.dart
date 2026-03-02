@@ -1,15 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:socket_io_client/socket_io_client.dart' as io;
 import '../../../../core/network/api_client.dart';
-import '../../../../core/config/app_config.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/widgets/app_bottom_nav.dart';
 import '../widgets/mural_tab.dart';
 import '../widgets/placar_tab.dart';
 import '../widgets/corridas_tab.dart';
 
-/// Tela principal de uma liga com abas: Mural | Placar | Corridas | Chat
+/// Tela principal de uma liga com abas: Mural | Placar | Corridas
 class LeagueDetailScreen extends StatefulWidget {
   final String leagueId;
 
@@ -30,21 +29,13 @@ class _LeagueDetailScreenState extends State<LeagueDetailScreen>
   bool _isOwner = false;
   bool _canPost = false;
   bool _isLoading = true;
-
-  // Chat (aba 3)
-  io.Socket? _socket;
-  List<Map<String, dynamic>> _messages = [];
-  String? _chatMode;
-  bool _canWrite = false;
-  bool _chatLoading = true;
-  final TextEditingController _chatController = TextEditingController();
-  final ScrollController _chatScroll = ScrollController();
+  bool _isAdmin = false;
+  bool _isMember = false;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
-    _tabController.addListener(_onTabChanged);
+    _tabController = TabController(length: 3, vsync: this);
     _myUserId = FirebaseAuth.instance.currentUser?.uid;
     _init();
   }
@@ -52,16 +43,7 @@ class _LeagueDetailScreenState extends State<LeagueDetailScreen>
   @override
   void dispose() {
     _tabController.dispose();
-    _socket?.disconnect();
-    _chatController.dispose();
-    _chatScroll.dispose();
     super.dispose();
-  }
-
-  void _onTabChanged() {
-    if (_tabController.index == 3 && _socket == null) {
-      _initChat();
-    }
   }
 
   Future<void> _init() async {
@@ -84,8 +66,8 @@ class _LeagueDetailScreenState extends State<LeagueDetailScreen>
       final postMode = league['post_mode'] ?? league['postMode'] ?? 'all';
 
       _isOwner = myId == ownerId;
-      _chatMode = league['chat_mode'] ?? league['chatMode'] ?? 'all';
-      _canWrite = _isOwner || _chatMode == 'all';
+      _isAdmin = me?['isAdmin'] == true || me?['is_admin'] == true;
+      _isMember = league['is_member'] == true;
       _canPost = _isOwner || postMode == 'all';
 
       setState(() {
@@ -95,63 +77,6 @@ class _LeagueDetailScreenState extends State<LeagueDetailScreen>
     } else {
       setState(() => _isLoading = false);
     }
-  }
-
-  Future<void> _initChat() async {
-    // Carrega histórico
-    final res =
-        await _api.get('/leagues/${widget.leagueId}/messages');
-    if (mounted && res.success && res.data != null) {
-      setState(() {
-        _messages = (res.data as List)
-            .map((m) => m as Map<String, dynamic>)
-            .toList();
-        _chatLoading = false;
-      });
-      _scrollToBottom();
-    } else if (mounted) {
-      setState(() => _chatLoading = false);
-    }
-
-    // Conecta Socket.io
-    final socketUrl =
-        AppConfig.apiBaseUrl.replaceAll('/api/v1', '');
-    _socket = io.io(socketUrl, {
-      'transports': ['websocket'],
-      'auth': {'userId': FirebaseAuth.instance.currentUser?.uid},
-    });
-
-    _socket!.onConnect((_) {
-      _socket!.emit('join_league', {'leagueId': widget.leagueId});
-    });
-
-    _socket!.on('new_league_message', (data) {
-      if (!mounted) return;
-      setState(() => _messages.add(data as Map<String, dynamic>));
-      _scrollToBottom();
-    });
-  }
-
-  void _sendChatMessage() {
-    final content = _chatController.text.trim();
-    if (content.isEmpty) return;
-    _chatController.clear();
-    _socket?.emit('send_league_message', {
-      'leagueId': widget.leagueId,
-      'content': content,
-    });
-  }
-
-  void _scrollToBottom() {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_chatScroll.hasClients) {
-        _chatScroll.animateTo(
-          _chatScroll.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeOut,
-        );
-      }
-    });
   }
 
   Future<void> _showPostSettings() async {
@@ -177,23 +102,19 @@ class _LeagueDetailScreenState extends State<LeagueDetailScreen>
                   style: TextStyle(
                       fontSize: 18, fontWeight: FontWeight.bold)),
               const SizedBox(height: 16),
-              RadioGroup<String>(
+              RadioListTile<String>(
+                value: 'all',
                 groupValue: selected,
+                title: const Text('Todos podem postar'),
+                activeColor: AppTheme.primaryRed,
                 onChanged: (v) => setModal(() => selected = v!),
-                child: Column(
-                  children: [
-                    RadioListTile<String>(
-                      value: 'all',
-                      title: const Text('Todos podem postar'),
-                      activeColor: AppTheme.primaryRed,
-                    ),
-                    RadioListTile<String>(
-                      value: 'leader_only',
-                      title: const Text('Apenas o líder pode postar'),
-                      activeColor: AppTheme.primaryRed,
-                    ),
-                  ],
-                ),
+              ),
+              RadioListTile<String>(
+                value: 'leader_only',
+                groupValue: selected,
+                title: const Text('Apenas o líder pode postar'),
+                activeColor: AppTheme.primaryRed,
+                onChanged: (v) => setModal(() => selected = v!),
               ),
               const SizedBox(height: 16),
               ElevatedButton(
@@ -221,76 +142,11 @@ class _LeagueDetailScreenState extends State<LeagueDetailScreen>
     );
   }
 
-  Future<void> _showChatSettings() async {
-    String selected = _chatMode ?? 'all';
-    final navigator = Navigator.of(context);
-    final messenger = ScaffoldMessenger.of(context);
-
-    await showModalBottomSheet(
-      context: context,
-      backgroundColor: AppTheme.cardBackground,
-      shape: const RoundedRectangleBorder(
-          borderRadius:
-              BorderRadius.vertical(top: Radius.circular(16))),
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setModal) => Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const Text('Configurações do Chat',
-                  style: TextStyle(
-                      fontSize: 18, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 16),
-              RadioGroup<String>(
-                groupValue: selected,
-                onChanged: (v) => setModal(() => selected = v!),
-                child: Column(
-                  children: [
-                    RadioListTile<String>(
-                      value: 'all',
-                      title: const Text('Todos podem escrever'),
-                      activeColor: AppTheme.primaryRed,
-                    ),
-                    RadioListTile<String>(
-                      value: 'leader_only',
-                      title: const Text('Apenas o líder'),
-                      activeColor: AppTheme.primaryRed,
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: () async {
-                  final res = await _api.put(
-                    '/leagues/${widget.leagueId}/chat-settings',
-                    body: {'chatMode': selected},
-                  );
-                  navigator.pop();
-                  if (res.success && mounted) {
-                    setState(() {
-                      _chatMode = selected;
-                      _canWrite = _isOwner || selected == 'all';
-                    });
-                    messenger.showSnackBar(const SnackBar(
-                        content: Text('Configurações salvas!')));
-                  }
-                },
-                child: const Text('Salvar'),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final leagueName =
         _league?['name'] as String? ?? 'Liga';
+    final showAdminBanner = _isAdmin && !_isMember;
 
     return Scaffold(
       appBar: AppBar(
@@ -305,7 +161,6 @@ class _LeagueDetailScreenState extends State<LeagueDetailScreen>
               icon: const Icon(Icons.settings_outlined),
               onSelected: (value) {
                 if (value == 'mural') _showPostSettings();
-                if (value == 'chat') _showChatSettings();
               },
               itemBuilder: (ctx) => [
                 const PopupMenuItem(
@@ -314,13 +169,6 @@ class _LeagueDetailScreenState extends State<LeagueDetailScreen>
                       Icon(Icons.article_outlined, size: 18),
                       SizedBox(width: 8),
                       Text('Config. Mural'),
-                    ])),
-                const PopupMenuItem(
-                    value: 'chat',
-                    child: Row(children: [
-                      Icon(Icons.chat_bubble_outline, size: 18),
-                      SizedBox(width: 8),
-                      Text('Config. Chat'),
                     ])),
               ],
             ),
@@ -336,227 +184,57 @@ class _LeagueDetailScreenState extends State<LeagueDetailScreen>
             Tab(text: 'Mural'),
             Tab(text: 'Placar'),
             Tab(text: 'Corridas'),
-            Tab(text: 'Chat'),
           ],
         ),
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : TabBarView(
-              controller: _tabController,
+          : Column(
               children: [
-                // Aba 1: Mural
-                MuralTab(
-                  leagueId: widget.leagueId,
-                  myUserId: _myUserId ?? '',
-                  isOwner: _isOwner,
-                  canPost: _canPost,
-                ),
-
-                // Aba 2: Placar
-                PlacarTab(
-                  leagueId: widget.leagueId,
-                  myUserId: _myUserId ?? '',
-                ),
-
-                // Aba 3: Corridas
-                CorridasTab(leagueId: widget.leagueId),
-
-                // Aba 4: Chat
-                _buildChatTab(),
-              ],
-            ),
-    );
-  }
-
-  Widget _buildChatTab() {
-    return Column(
-      children: [
-        if (!_canWrite)
-          Container(
-            width: double.infinity,
-            padding:
-                const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-            color: AppTheme.surfaceColor,
-            child: Row(
-              children: [
-                const Icon(Icons.lock_outline,
-                    size: 14, color: AppTheme.textSecondary),
-                const SizedBox(width: 6),
-                Text(
-                  _chatMode == 'leader_only'
-                      ? 'Apenas o líder pode enviar mensagens'
-                      : 'Você não tem permissão para escrever aqui',
-                  style: const TextStyle(
-                      color: AppTheme.textSecondary, fontSize: 12),
-                ),
-              ],
-            ),
-          ),
-        Expanded(
-          child: _chatLoading
-              ? const Center(child: CircularProgressIndicator())
-              : _messages.isEmpty
-                  ? const Center(
-                      child: Text('Nenhuma mensagem ainda.',
+                // Banner "Visualizando como Admin"
+                if (showAdminBanner)
+                  Container(
+                    width: double.infinity,
+                    color: Colors.red.shade900,
+                    padding: const EdgeInsets.symmetric(
+                        vertical: 6, horizontal: 16),
+                    child: const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.admin_panel_settings,
+                            size: 14, color: Colors.white70),
+                        SizedBox(width: 6),
+                        Text(
+                          'Visualizando como Admin',
                           style: TextStyle(
-                              color: AppTheme.textSecondary)),
-                    )
-                  : ListView.builder(
-                      controller: _chatScroll,
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 8),
-                      itemCount: _messages.length,
-                      itemBuilder: (context, i) =>
-                          _buildBubble(_messages[i]),
+                              color: Colors.white70,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500),
+                        ),
+                      ],
                     ),
-        ),
-        if (_canWrite) _buildChatInput(),
-      ],
-    );
-  }
-
-  Widget _buildBubble(Map<String, dynamic> msg) {
-    final senderId = msg['sender_id'] ?? msg['senderId'];
-    final sender = msg['sender'] as Map<String, dynamic>?;
-    final senderName = msg['sender_name'] ??
-        msg['senderName'] ??
-        sender?['displayName'] ??
-        'Usuário';
-    final senderAvatar =
-        msg['sender_avatar'] ?? msg['senderAvatar'] ?? sender?['avatarUrl'];
-    final isMe = senderId == _myUserId ||
-        sender?['id'] == _myUserId;
-    final content = msg['content'] as String? ?? '';
-    final createdAt = msg['created_at'] ?? msg['createdAt'];
-    String timeStr = '';
-    if (createdAt != null) {
-      final dt = DateTime.tryParse(createdAt.toString());
-      if (dt != null) {
-        timeStr =
-            '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
-      }
-    }
-
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.end,
-        mainAxisAlignment:
-            isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
-        children: [
-          if (!isMe) ...[
-            CircleAvatar(
-              radius: 14,
-              backgroundColor: AppTheme.surfaceColor,
-              backgroundImage: senderAvatar != null
-                  ? NetworkImage(senderAvatar.toString())
-                  : null,
-              child: senderAvatar == null
-                  ? Text(senderName[0].toUpperCase(),
-                      style: const TextStyle(
-                          color: AppTheme.primaryRed,
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold))
-                  : null,
-            ),
-            const SizedBox(width: 6),
-          ],
-          Flexible(
-            child: Container(
-              constraints: BoxConstraints(
-                  maxWidth:
-                      MediaQuery.of(context).size.width * 0.68),
-              padding: const EdgeInsets.symmetric(
-                  horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(
-                color: isMe
-                    ? AppTheme.primaryRed.withValues(alpha: 0.85)
-                    : AppTheme.surfaceColor,
-                borderRadius: BorderRadius.only(
-                  topLeft: const Radius.circular(14),
-                  topRight: const Radius.circular(14),
-                  bottomLeft: isMe
-                      ? const Radius.circular(14)
-                      : const Radius.circular(4),
-                  bottomRight: isMe
-                      ? const Radius.circular(4)
-                      : const Radius.circular(14),
+                  ),
+                Expanded(
+                  child: TabBarView(
+                    controller: _tabController,
+                    children: [
+                      MuralTab(
+                        leagueId: widget.leagueId,
+                        myUserId: _myUserId ?? '',
+                        isOwner: _isOwner,
+                        canPost: _canPost,
+                      ),
+                      PlacarTab(
+                        leagueId: widget.leagueId,
+                        myUserId: _myUserId ?? '',
+                      ),
+                      CorridasTab(leagueId: widget.leagueId),
+                    ],
+                  ),
                 ),
-              ),
-              child: Column(
-                crossAxisAlignment: isMe
-                    ? CrossAxisAlignment.end
-                    : CrossAxisAlignment.start,
-                children: [
-                  if (!isMe)
-                    Text(senderName.toString(),
-                        style: const TextStyle(
-                            color: AppTheme.primaryRed,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600)),
-                  Text(content,
-                      style: TextStyle(
-                          color:
-                              isMe ? Colors.black : AppTheme.textPrimary,
-                          fontSize: 14)),
-                  const SizedBox(height: 2),
-                  Text(timeStr,
-                      style: TextStyle(
-                          color: isMe
-                              ? Colors.black54
-                              : AppTheme.textSecondary,
-                          fontSize: 10)),
-                ],
-              ),
+              ],
             ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildChatInput() {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(12, 8, 8, 12),
-      decoration: const BoxDecoration(
-        color: AppTheme.cardBackground,
-        border: Border(top: BorderSide(color: Color(0x14FFFFFF))),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: TextField(
-              controller: _chatController,
-              decoration: const InputDecoration(
-                hintText: 'Mensagem para a liga...',
-                border: OutlineInputBorder(
-                  borderRadius:
-                      BorderRadius.all(Radius.circular(24)),
-                  borderSide: BorderSide.none,
-                ),
-                filled: true,
-                fillColor: AppTheme.surfaceColor,
-                contentPadding: EdgeInsets.symmetric(
-                    horizontal: 16, vertical: 10),
-              ),
-              minLines: 1,
-              maxLines: 4,
-              onSubmitted: (_) => _sendChatMessage(),
-            ),
-          ),
-          const SizedBox(width: 8),
-          IconButton(
-            onPressed: _sendChatMessage,
-            icon: const Icon(Icons.send_rounded,
-                color: AppTheme.primaryRed),
-            style: IconButton.styleFrom(
-              backgroundColor: AppTheme.surfaceColor,
-              padding: const EdgeInsets.all(12),
-            ),
-          ),
-        ],
-      ),
+      bottomNavigationBar: AppBottomNav(selectedIndex: 1),
     );
   }
 }

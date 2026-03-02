@@ -48,6 +48,8 @@ class _PredictionScreenState extends State<PredictionScreen> {
   // Ordenação rápida
   bool _isLoadingQuickOrder = false;
   bool _hasPreviousPrediction = false;
+  bool _hasCompletedRacesThisYear = false;
+  bool _hasAiOrder = false;
 
   @override
   void initState() {
@@ -137,6 +139,29 @@ class _PredictionScreenState extends State<PredictionScreen> {
         _isLoading = false;
       });
     }
+
+    // Busca corridas completadas do ano e ordem IA (em paralelo, não bloqueiam o carregamento)
+    final thisYear = DateTime.now().year;
+    final extras = await Future.wait([
+      _api.get('/races/all'),
+      _api.get('/races/${widget.raceId}/ai-order'),
+    ]);
+    if (mounted) {
+      setState(() {
+        final allRacesRes = extras[0];
+        if (allRacesRes.success && allRacesRes.data != null) {
+          final races = allRacesRes.data as List;
+          _hasCompletedRacesThisYear = races.any((r) {
+            final year = DateTime.tryParse(r['race_date'] ?? '')?.year;
+            return year == thisYear && r['is_completed'] == true;
+          });
+        }
+        final aiRes = extras[1];
+        if (aiRes.success && aiRes.data != null) {
+          _hasAiOrder = (aiRes.data as List).isNotEmpty;
+        }
+      });
+    }
   }
 
   // ── Ordenação Rápida ───────────────────────────────────────────
@@ -188,6 +213,42 @@ class _PredictionScreenState extends State<PredictionScreen> {
     });
   }
 
+  Future<void> _applyAiOrder() async {
+    setState(() => _isLoadingQuickOrder = true);
+
+    final res = await _api.get('/races/${widget.raceId}/ai-order');
+
+    if (!mounted) return;
+    setState(() => _isLoadingQuickOrder = false);
+
+    if (!res.success || res.data == null || (res.data as List).isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('IA não disponível para esta corrida')),
+      );
+      return;
+    }
+
+    final ordered = List.from(res.data as List)
+      ..sort((a, b) =>
+          (a['predicted_position'] as int).compareTo(b['predicted_position'] as int));
+    final orderedIds = ordered.map((e) => e['driver_id'] as int).toList();
+
+    setState(() {
+      final reordered = <dynamic>[];
+      for (final id in orderedIds) {
+        final driver = _drivers.firstWhere(
+          (d) => d['id'] == id,
+          orElse: () => null,
+        );
+        if (driver != null) reordered.add(driver);
+      }
+      for (final d in _drivers) {
+        if (!reordered.any((r) => r['id'] == d['id'])) reordered.add(d);
+      }
+      _drivers = reordered;
+    });
+  }
+
   Widget _buildQuickOrderButtons() {
     final isRound1 = (_race?['round'] as int? ?? 1) == 1;
 
@@ -223,12 +284,16 @@ class _PredictionScreenState extends State<PredictionScreen> {
                       _QuickBtn(
                         'Última Corrida',
                         Icons.history,
-                        onTap: isRound1 ? null : () => _applyQuickOrder('last-race'),
+                        onTap: (isRound1 || !_hasCompletedRacesThisYear)
+                            ? null
+                            : () => _applyQuickOrder('last-race'),
                       ),
                       _QuickBtn(
                         'Campeonato',
                         Icons.military_tech,
-                        onTap: isRound1 ? null : () => _applyQuickOrder('standings'),
+                        onTap: (isRound1 || !_hasCompletedRacesThisYear)
+                            ? null
+                            : () => _applyQuickOrder('standings'),
                       ),
                       _QuickBtn(
                         'Último Palpite',
@@ -240,7 +305,7 @@ class _PredictionScreenState extends State<PredictionScreen> {
                       _QuickBtn(
                         'Por IA',
                         Icons.auto_awesome,
-                        onTap: null, // desabilitado — futuro
+                        onTap: _hasAiOrder ? _applyAiOrder : null,
                       ),
                     ],
                   ),

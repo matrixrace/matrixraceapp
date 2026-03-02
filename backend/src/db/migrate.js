@@ -386,6 +386,43 @@ async function migrate() {
     `);
     console.log('✓ Tabela league_poll_votes criada');
 
+    // =============================================
+    // TABELA DE ORDEM IA POR CORRIDA
+    // =============================================
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS race_ai_orders (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        race_id INTEGER REFERENCES races(id) ON DELETE CASCADE NOT NULL,
+        driver_id INTEGER REFERENCES drivers(id) ON DELETE CASCADE NOT NULL,
+        predicted_position INTEGER NOT NULL,
+        UNIQUE(race_id, driver_id),
+        UNIQUE(race_id, predicted_position)
+      );
+    `);
+    console.log('✓ Tabela race_ai_orders criada');
+
+    // =============================================
+    // TABELA DE CONFIGURAÇÕES DO SISTEMA
+    // =============================================
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS system_settings (
+        key VARCHAR(100) PRIMARY KEY,
+        value TEXT NOT NULL
+      );
+    `);
+    console.log('✓ Tabela system_settings criada');
+
+    // Popula configurações padrão se não existirem
+    await client.query(`
+      INSERT INTO system_settings (key, value) VALUES
+        ('max_leagues_join', '10'),
+        ('max_leagues_create', '3')
+      ON CONFLICT (key) DO NOTHING;
+    `);
+    console.log('✓ Configurações padrão de ligas inseridas');
+
     // Criar índices para melhor performance
     console.log('\nCriando índices...');
 

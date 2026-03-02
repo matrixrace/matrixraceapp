@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import '../../../../../core/network/api_client.dart';
 import '../../../../../core/theme/app_theme.dart';
 
@@ -88,7 +89,9 @@ class _PlacarTabState extends State<PlacarTab>
               int.tryParse(entry['racesPlayed']?.toString() ?? '0') ?? 0;
           final isMe = userId.toString() == widget.myUserId;
 
-          return Container(
+          return InkWell(
+            onTap: () => context.push('/users/$userId'),
+            child: Container(
             color: isMe
                 ? AppTheme.primaryRed.withValues(alpha: 0.06)
                 : null,
@@ -158,6 +161,7 @@ class _PlacarTabState extends State<PlacarTab>
                         fontSize: 11, color: AppTheme.textSecondary)),
               ],
             ),
+          ),
           );
         },
       ),

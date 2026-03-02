@@ -19,6 +19,10 @@ import '../features/chat/presentation/screens/league_chat_screen.dart';
 import '../features/notifications/presentation/screens/notifications_screen.dart';
 import '../features/leagues/presentation/screens/league_detail_screen.dart';
 import '../features/f1results/presentation/screens/f1_results_screen.dart';
+import '../features/profile/presentation/screens/user_profile_screen.dart';
+import '../features/admin/presentation/screens/admin_ai_order_screen.dart';
+import '../features/admin/presentation/screens/admin_users_screen.dart';
+import '../features/admin/presentation/screens/admin_user_leagues_screen.dart';
 
 /// Configuração de rotas do app
 class AppRouter {
@@ -121,6 +125,12 @@ class AppRouter {
         path: '/notifications',
         builder: (context, state) => const NotificationsScreen(),
       ),
+      GoRoute(
+        path: '/users/:userId',
+        builder: (context, state) => UserProfileScreen(
+          userId: state.pathParameters['userId']!,
+        ),
+      ),
 
       // ── Painel Admin ──────────────────────────────────────────
       GoRoute(
@@ -152,6 +162,20 @@ class AppRouter {
         path: '/admin/leagues',
         builder: (context, state) =>
             const AdminShellScreen(section: 'leagues'),
+      ),
+      GoRoute(
+        path: '/admin/ai-order',
+        builder: (context, state) =>
+            const AdminShellScreen(section: 'ai_order'),
+      ),
+      GoRoute(
+        path: '/admin/users',
+        builder: (context, state) =>
+            const AdminShellScreen(section: 'users'),
+      ),
+      GoRoute(
+        path: '/admin/user-leagues',
+        builder: (context, state) => const AdminUserLeaguesScreen(),
       ),
     ],
 

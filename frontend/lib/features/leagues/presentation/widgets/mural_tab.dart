@@ -326,38 +326,57 @@ class _NextRaceCard extends StatefulWidget {
 }
 
 class _NextRaceCardState extends State<_NextRaceCard> {
-  late Duration _timeLeft;
-  late DateTime _lockDate;
+  // Ticker para atualizar a cada segundo
+  bool _ticking = true;
+
+  DateTime? _fp1Date;
+  DateTime? _qualiDate;
+  DateTime? _raceDate;
 
   @override
   void initState() {
     super.initState();
-    final fp1 = widget.race['fp1_date'] != null
-        ? DateTime.tryParse(widget.race['fp1_date'].toString())
+    _fp1Date = widget.race['fp1_date'] != null
+        ? DateTime.tryParse(widget.race['fp1_date'].toString())?.toLocal()
         : null;
-    final quali = widget.race['qualifying_date'] != null
-        ? DateTime.tryParse(widget.race['qualifying_date'].toString())
+    _qualiDate = widget.race['qualifying_date'] != null
+        ? DateTime.tryParse(widget.race['qualifying_date'].toString())?.toLocal()
         : null;
-    final race = DateTime.tryParse(widget.race['race_date'].toString()) ??
-        DateTime.now();
-    _lockDate = fp1 ?? quali ?? race;
-    _timeLeft = _lockDate.difference(DateTime.now());
+    _raceDate = widget.race['race_date'] != null
+        ? DateTime.tryParse(widget.race['race_date'].toString())?.toLocal()
+        : null;
     _tick();
+  }
+
+  @override
+  void dispose() {
+    _ticking = false;
+    super.dispose();
   }
 
   void _tick() {
     Future.delayed(const Duration(seconds: 1), () {
-      if (!mounted) return;
-      setState(() => _timeLeft = _lockDate.difference(DateTime.now()));
+      if (!mounted || !_ticking) return;
+      setState(() {});
       _tick();
     });
+  }
+
+  Duration _timeLeft(DateTime? target) {
+    if (target == null) return Duration.zero;
+    final diff = target.difference(DateTime.now());
+    return diff.isNegative ? Duration.zero : diff;
   }
 
   @override
   Widget build(BuildContext context) {
     final name = widget.race['name'] as String? ?? '';
     final round = widget.race['round'] as int? ?? 0;
-    final d = _timeLeft.isNegative ? Duration.zero : _timeLeft;
+    final now = DateTime.now();
+
+    final fp1Future   = _fp1Date != null && _fp1Date!.isAfter(now);
+    final qualiFuture = _qualiDate != null && _qualiDate!.isAfter(now);
+    final raceFuture  = _raceDate != null && _raceDate!.isAfter(now);
 
     return Container(
       margin: const EdgeInsets.fromLTRB(12, 12, 12, 4),
@@ -388,24 +407,30 @@ class _NextRaceCardState extends State<_NextRaceCard> {
           Text(name,
               style: const TextStyle(
                   fontSize: 15, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 10),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              // Countdown
-              Row(
-                children: [
-                  _CountdownUnit(value: d.inDays, label: 'd'),
-                  _Separator(),
-                  _CountdownUnit(value: d.inHours % 24, label: 'h'),
-                  _Separator(),
-                  _CountdownUnit(value: d.inMinutes % 60, label: 'm'),
-                  _Separator(),
-                  _CountdownUnit(value: d.inSeconds % 60, label: 's'),
-                ],
-              ),
-              _buildPredictionButton(context),
-            ],
+          const SizedBox(height: 12),
+
+          // Countdown TL1 (lock de palpites)
+          if (fp1Future) ...[
+            _CountdownRow(label: 'Treino Livre 1', d: _timeLeft(_fp1Date)),
+            const SizedBox(height: 8),
+          ],
+
+          // Countdown Qualificação
+          if (qualiFuture) ...[
+            _CountdownRow(label: 'Qualificação', d: _timeLeft(_qualiDate)),
+            const SizedBox(height: 8),
+          ],
+
+          // Countdown Corrida
+          if (raceFuture) ...[
+            _CountdownRow(label: 'Corrida', d: _timeLeft(_raceDate)),
+            const SizedBox(height: 8),
+          ],
+
+          // Botão de palpite
+          Align(
+            alignment: Alignment.centerRight,
+            child: _buildPredictionButton(context),
           ),
         ],
       ),
@@ -450,6 +475,36 @@ class _NextRaceCardState extends State<_NextRaceCard> {
   }
 }
 
+// Linha de countdown com label (ex: "Qualificação") + dígitos d:h:m:s
+class _CountdownRow extends StatelessWidget {
+  final String label;
+  final Duration d;
+  const _CountdownRow({required this.label, required this.d});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(label,
+            style: const TextStyle(
+                fontSize: 11, color: AppTheme.textSecondary)),
+        Row(
+          children: [
+            _CountdownUnit(value: d.inDays, label: 'd'),
+            _Separator(),
+            _CountdownUnit(value: d.inHours % 24, label: 'h'),
+            _Separator(),
+            _CountdownUnit(value: d.inMinutes % 60, label: 'm'),
+            _Separator(),
+            _CountdownUnit(value: d.inSeconds % 60, label: 's'),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
 class _CountdownUnit extends StatelessWidget {
   final int value;
   final String label;
@@ -460,7 +515,7 @@ class _CountdownUnit extends StatelessWidget {
       children: [
         Text(value.toString().padLeft(2, '0'),
             style: const TextStyle(
-                fontSize: 20,
+                fontSize: 18,
                 fontWeight: FontWeight.bold,
                 color: AppTheme.primaryRed)),
         Text(label,
@@ -475,10 +530,10 @@ class _Separator extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return const Padding(
-      padding: EdgeInsets.symmetric(horizontal: 4),
+      padding: EdgeInsets.symmetric(horizontal: 3),
       child: Text(':',
           style: TextStyle(
-              fontSize: 18,
+              fontSize: 16,
               fontWeight: FontWeight.bold,
               color: AppTheme.textSecondary)),
     );

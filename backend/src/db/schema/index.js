@@ -23,6 +23,8 @@ const { leaguePostComments } = require('./leaguePostComments');
 const { leaguePolls } = require('./leaguePolls');
 const { leaguePollOptions } = require('./leaguePollOptions');
 const { leaguePollVotes } = require('./leaguePollVotes');
+const { raceAiOrders } = require('./race_ai_orders');
+const { systemSettings } = require('./system_settings');
 
 module.exports = {
   users,
@@ -47,4 +49,6 @@ module.exports = {
   leaguePolls,
   leaguePollOptions,
   leaguePollVotes,
+  raceAiOrders,
+  systemSettings,
 };

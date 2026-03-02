@@ -117,7 +117,7 @@ async function getLeagueRanking(leagueId) {
     FROM league_members lm
     JOIN users u ON u.id = lm.user_id
     LEFT JOIN scores s ON s.user_id = lm.user_id AND s.league_id = lm.league_id
-    WHERE lm.league_id = $1
+    WHERE lm.league_id = $1 AND u.is_admin = false
     GROUP BY u.id, u.display_name, u.avatar_url
     ORDER BY total_points DESC`,
     [leagueId]
@@ -154,7 +154,7 @@ async function getRaceRanking(leagueId, raceId) {
       WHERE user_id = lm.user_id AND race_id = $2
       LIMIT 1
     ) p_meta ON true
-    WHERE lm.league_id = $1
+    WHERE lm.league_id = $1 AND u.is_admin = false
     ORDER BY points DESC`,
     [leagueId, raceId]
   );

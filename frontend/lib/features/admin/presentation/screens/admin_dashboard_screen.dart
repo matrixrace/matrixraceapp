@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/network/api_client.dart';
 
@@ -67,7 +68,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       _StatCard(label: 'Usuários', value: _stats?['total_users'] ?? 0, icon: Icons.people, color: Colors.blue),
       _StatCard(label: 'Corridas', value: _stats?['total_races'] ?? 0, icon: Icons.flag, color: AppTheme.primaryRed),
       _StatCard(label: 'Concluídas', value: _stats?['completed_races'] ?? 0, icon: Icons.check_circle, color: AppTheme.successGreen),
-      _StatCard(label: 'Ligas', value: _stats?['total_leagues'] ?? 0, icon: Icons.groups, color: AppTheme.accentGold),
+      _StatCard(label: 'Ligas', value: _stats?['total_leagues'] ?? 0, icon: Icons.groups, color: AppTheme.accentGold, onTap: () => context.go('/admin/user-leagues')),
       _StatCard(label: 'Ligas Of.', value: _stats?['official_leagues'] ?? 0, icon: Icons.verified, color: Colors.purple),
       _StatCard(label: 'Palpites', value: _stats?['total_predictions'] ?? 0, icon: Icons.edit, color: Colors.teal),
     ];
@@ -89,11 +90,14 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   }
 
   Widget _buildStatCard(_StatCard c) {
-    return Container(
+    return InkWell(
+      onTap: c.onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
       decoration: BoxDecoration(
         color: AppTheme.cardBackground,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: c.color.withValues(alpha: 0.3)),
+        border: Border.all(color: c.color.withValues(alpha: c.onTap != null ? 0.6 : 0.3)),
       ),
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -116,6 +120,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             ],
           ),
         ],
+      ),
       ),
     );
   }
@@ -175,5 +180,6 @@ class _StatCard {
   final dynamic value;
   final IconData icon;
   final Color color;
-  const _StatCard({required this.label, required this.value, required this.icon, required this.color});
+  final VoidCallback? onTap;
+  const _StatCard({required this.label, required this.value, required this.icon, required this.color, this.onTap});
 }

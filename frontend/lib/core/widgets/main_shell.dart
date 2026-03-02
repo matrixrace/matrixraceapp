@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import '../network/api_client.dart';
 import '../theme/app_theme.dart';
+import '../widgets/app_bottom_nav.dart';
 import '../../features/auth/presentation/bloc/auth_bloc.dart';
 
 /// Shell compartilhado entre as 4 telas principais:
@@ -149,57 +150,7 @@ class _MainShellState extends State<MainShell> {
         ],
       ),
       body: widget.child,
-      bottomNavigationBar: BlocBuilder<AuthBloc, AuthState>(
-        builder: (context, state) {
-          if (state is! AuthAuthenticated) return const SizedBox.shrink();
-          final idx = _selectedIndex(context);
-          return NavigationBar(
-            backgroundColor: AppTheme.cardBackground,
-            selectedIndex: idx,
-            onDestinationSelected: (index) {
-              switch (index) {
-                case 0:
-                  context.go('/');
-                case 1:
-                  context.go('/leagues');
-                case 2:
-                  context.go('/rankings');
-                case 3:
-                  context.go('/f1-results');
-                case 4:
-                  context.go('/profile');
-              }
-            },
-            destinations: const [
-              NavigationDestination(
-                icon: Icon(Icons.home_outlined),
-                selectedIcon: Icon(Icons.home),
-                label: 'Início',
-              ),
-              NavigationDestination(
-                icon: Icon(Icons.groups_outlined),
-                selectedIcon: Icon(Icons.groups),
-                label: 'Ligas',
-              ),
-              NavigationDestination(
-                icon: Icon(Icons.leaderboard_outlined),
-                selectedIcon: Icon(Icons.leaderboard),
-                label: 'Ranking',
-              ),
-              NavigationDestination(
-                icon: Icon(Icons.emoji_events_outlined),
-                selectedIcon: Icon(Icons.emoji_events),
-                label: 'Histórico',
-              ),
-              NavigationDestination(
-                icon: Icon(Icons.person_outline),
-                selectedIcon: Icon(Icons.person),
-                label: 'Perfil',
-              ),
-            ],
-          );
-        },
-      ),
+      bottomNavigationBar: AppBottomNav(selectedIndex: _selectedIndex(context)),
     );
   }
 }

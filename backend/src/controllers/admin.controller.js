@@ -21,7 +21,7 @@ async function getDashboardStats(req, res, next) {
         (SELECT COUNT(*) FROM races WHERE is_completed = true) as completed_races,
         (SELECT COUNT(*) FROM leagues) as total_leagues,
         (SELECT COUNT(*) FROM leagues WHERE is_official = true) as official_leagues,
-        (SELECT COUNT(*) FROM predictions) as total_predictions,
+        (SELECT COUNT(DISTINCT (user_id, race_id)) FROM predictions) as total_predictions,
         (SELECT COUNT(*) FROM league_members) as total_memberships
     `);
 
@@ -700,6 +700,150 @@ async function syncDriversAndTeams(req, res, next) {
   }
 }
 
+// ========================
+// PALPITE IA (AI ORDER)
+// ========================
+
+// GET /api/v1/admin/races/:id/ai-order
+async function getAiOrder(req, res, next) {
+  try {
+    const raceId = parseInt(req.params.id);
+    const result = await pool.query(
+      `SELECT d.id as driver_id, d.first_name, d.last_name, d.number, d.photo_url,
+              t.name as team_name, t.color_primary as team_color,
+              ao.predicted_position
+       FROM race_ai_orders ao
+       JOIN drivers d ON d.id = ao.driver_id
+       LEFT JOIN teams t ON t.id = d.team_id
+       WHERE ao.race_id = $1
+       ORDER BY ao.predicted_position`,
+      [raceId]
+    );
+    res.json(successResponse(result.rows));
+  } catch (error) {
+    next(error);
+  }
+}
+
+// PUT /api/v1/admin/races/:id/ai-order
+// Body: { order: [{driverId, position}] }
+async function setAiOrder(req, res, next) {
+  try {
+    const raceId = parseInt(req.params.id);
+    const { order } = req.body;
+
+    if (!order || !Array.isArray(order)) {
+      return next(errorResponse('Formato inválido: envie order como array de {driverId, position}', 400));
+    }
+
+    // Remove ordem anterior e insere nova
+    await pool.query('DELETE FROM race_ai_orders WHERE race_id = $1', [raceId]);
+
+    if (order.length > 0) {
+      const values = order.map((_, i) => `($${i * 3 + 1}, $${i * 3 + 2}, $${i * 3 + 3})`).join(', ');
+      const params = order.flatMap(o => [raceId, o.driverId, o.position]);
+      await pool.query(
+        `INSERT INTO race_ai_orders (race_id, driver_id, predicted_position) VALUES ${values}`,
+        params
+      );
+    }
+
+    logger.info(`Ordem IA definida para corrida ${raceId}: ${order.length} pilotos`);
+    res.json(successResponse(null, 'Ordem IA salva com sucesso'));
+  } catch (error) {
+    next(error);
+  }
+}
+
+// ========================
+// CONFIGURAÇÕES DO SISTEMA
+// ========================
+
+// GET /api/v1/admin/settings
+async function getSettings(req, res, next) {
+  try {
+    const result = await pool.query('SELECT key, value FROM system_settings ORDER BY key');
+    const settings = {};
+    for (const row of result.rows) {
+      settings[row.key] = row.value;
+    }
+    res.json(successResponse(settings));
+  } catch (error) {
+    next(error);
+  }
+}
+
+// PUT /api/v1/admin/settings
+// Body: { key, value }
+async function updateSettings(req, res, next) {
+  try {
+    const { key, value } = req.body;
+    if (!key || value === undefined) {
+      return next(errorResponse('Campos key e value são obrigatórios', 400));
+    }
+
+    await pool.query(
+      `INSERT INTO system_settings (key, value) VALUES ($1, $2)
+       ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
+      [key, String(value)]
+    );
+
+    res.json(successResponse({ key, value }, 'Configuração atualizada'));
+  } catch (error) {
+    next(error);
+  }
+}
+
+// ========================
+// LIGAS DE USUÁRIOS
+// ========================
+
+// GET /api/v1/admin/leagues/user-leagues
+async function getUserLeagues(req, res, next) {
+  try {
+    const result = await pool.query(
+      `SELECT l.*,
+              u.display_name as owner_name,
+              COUNT(DISTINCT lm.user_id) FILTER (WHERE NOT EXISTS (
+                SELECT 1 FROM users WHERE id = lm.user_id AND is_admin = true
+              )) as member_count
+       FROM leagues l
+       JOIN users u ON u.id = l.owner_id
+       LEFT JOIN league_members lm ON lm.league_id = l.id AND lm.status = 'active'
+       WHERE l.is_official = false
+       GROUP BY l.id, u.display_name
+       ORDER BY l.created_at DESC`
+    );
+    res.json(successResponse(result.rows));
+  } catch (error) {
+    next(error);
+  }
+}
+
+// ========================
+// USUÁRIOS (LISTA ADMIN)
+// ========================
+
+// GET /api/v1/admin/users
+async function getAdminUsers(req, res, next) {
+  try {
+    const result = await pool.query(
+      `SELECT u.id, u.display_name, u.email, u.avatar_url, u.is_admin, u.created_at,
+              COUNT(DISTINCT lm.league_id) as leagues_joined,
+              COUNT(DISTINCT l.id) as leagues_created
+       FROM users u
+       LEFT JOIN league_members lm ON lm.user_id = u.id AND lm.status = 'active'
+       LEFT JOIN leagues l ON l.owner_id = u.id AND l.is_official = false
+       WHERE u.is_admin = false
+       GROUP BY u.id
+       ORDER BY u.display_name`
+    );
+    res.json(successResponse(result.rows));
+  } catch (error) {
+    next(error);
+  }
+}
+
 module.exports = {
   // Dashboard
   getDashboardStats,
@@ -713,4 +857,12 @@ module.exports = {
   createRaceResults, calculateScores,
   // Official Leagues
   getOfficialLeagues, createOfficialLeague, updateOfficialLeague, deleteOfficialLeague, seedOfficialLeagues,
+  // AI Order
+  getAiOrder, setAiOrder,
+  // Settings
+  getSettings, updateSettings,
+  // User Leagues
+  getUserLeagues,
+  // Admin Users
+  getAdminUsers,
 };

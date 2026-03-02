@@ -178,6 +178,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         'firebaseUid': user.uid,
         'email': user.email ?? '',
         'displayName': user.displayName ?? user.email?.split('@').first ?? 'Usuário',
+        'photoUrl': user.photoURL ?? '',
       });
 
       emit(AuthAuthenticated(user));

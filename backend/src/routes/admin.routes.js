@@ -6,6 +6,10 @@ const {
   getRaces, createRace, updateRace, deleteRace, syncRaceSchedule,
   createRaceResults, calculateScores,
   getOfficialLeagues, createOfficialLeague, updateOfficialLeague, deleteOfficialLeague, seedOfficialLeagues,
+  getAiOrder, setAiOrder,
+  getSettings, updateSettings,
+  getUserLeagues,
+  getAdminUsers,
 } = require('../controllers/admin.controller');
 const { authenticate } = require('../middleware/auth');
 const { requireAdmin } = require('../middleware/adminCheck');
@@ -53,11 +57,23 @@ router.delete('/races/:id', deleteRace);
 router.post('/races/:id/results', validate(createRaceResultsSchema), createRaceResults);
 router.post('/races/:id/calculate-scores', calculateScores);
 
+// Palpite IA (deve vir ANTES de /races/:id)
+router.get('/races/:id/ai-order', getAiOrder);
+router.put('/races/:id/ai-order', setAiOrder);
+
 // Ligas Oficiais
 router.get('/leagues', getOfficialLeagues);
+router.get('/leagues/user-leagues', getUserLeagues); // deve vir ANTES de /:id
 router.post('/leagues/seed', seedOfficialLeagues);
 router.post('/leagues', validate(createOfficialLeagueSchema), createOfficialLeague);
 router.put('/leagues/:id', validate(updateOfficialLeagueSchema), updateOfficialLeague);
 router.delete('/leagues/:id', deleteOfficialLeague);
+
+// Configurações do sistema
+router.get('/settings', getSettings);
+router.put('/settings', updateSettings);
+
+// Usuários
+router.get('/users', getAdminUsers);
 
 module.exports = router;
