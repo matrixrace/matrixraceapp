@@ -569,7 +569,7 @@ async function seedOfficialLeagues(req, res, next) {
 }
 
 // POST /api/v1/admin/races/sync-schedule?year=2026
-// Busca o calendário oficial da Jolpica e atualiza fp1_date, qualifying_date, race_date de cada GP
+// Busca o calendário oficial da Jolpica e faz upsert das corridas (insere ou atualiza)
 async function syncRaceSchedule(req, res, next) {
   try {
     const year = parseInt(req.query.year) || new Date().getFullYear();
@@ -581,8 +581,7 @@ async function syncRaceSchedule(req, res, next) {
       return res.status(404).json(errorResponse(`Nenhuma corrida encontrada na Jolpica para ${year}`));
     }
 
-    let updated = 0;
-    let notFound = 0;
+    let upserted = 0;
 
     for (const jr of jolpicaRaces) {
       const round = parseInt(jr.round);
@@ -597,22 +596,38 @@ async function syncRaceSchedule(req, res, next) {
 
       if (!raceDate) continue;
 
-      const result = await pool.query(
-        `UPDATE races
-         SET fp1_date = $1, qualifying_date = $2, race_date = $3, updated_at = NOW()
-         WHERE season = $4 AND round = $5
-         RETURNING id`,
-        [fp1Date, qualifyingDate, raceDate, year, round]
+      await pool.query(
+        `INSERT INTO races (name, location, country, circuit_name, fp1_date, qualifying_date, race_date, season, round)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+         ON CONFLICT (season, round) DO UPDATE
+         SET name = EXCLUDED.name,
+             location = EXCLUDED.location,
+             country = EXCLUDED.country,
+             circuit_name = EXCLUDED.circuit_name,
+             fp1_date = EXCLUDED.fp1_date,
+             qualifying_date = EXCLUDED.qualifying_date,
+             race_date = EXCLUDED.race_date,
+             updated_at = NOW()`,
+        [
+          jr.raceName,
+          jr.Circuit?.circuitName || jr.raceName,
+          jr.Circuit?.Location?.country || '',
+          jr.Circuit?.circuitName || '',
+          fp1Date,
+          qualifyingDate,
+          raceDate,
+          year,
+          round,
+        ]
       );
 
-      if (result.rowCount > 0) updated++;
-      else notFound++;
+      upserted++;
     }
 
-    logger.info(`Sync schedule ${year}: ${updated} atualizadas, ${notFound} não encontradas no DB`);
+    logger.info(`Sync schedule ${year}: ${upserted} corridas sincronizadas`);
     res.json(successResponse(
-      { year, updated, notFound },
-      `${updated} corridas sincronizadas com horários oficiais da F1`
+      { year, upserted },
+      `${upserted} corridas sincronizadas com horários oficiais da F1`
     ));
   } catch (error) {
     next(error);
