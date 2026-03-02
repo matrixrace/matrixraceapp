@@ -22,12 +22,27 @@ class _AdminDriversScreenState extends State<AdminDriversScreen> {
   List<dynamic> _drivers = [];
   List<dynamic> _teams = [];
   bool _loading = true;
+  bool _syncing = false;
   String _search = '';
 
   @override
   void initState() {
     super.initState();
     _load();
+  }
+
+  Future<void> _syncDrivers() async {
+    final year = DateTime.now().year;
+    setState(() => _syncing = true);
+    final res = await _api.post('/admin/drivers/sync?year=$year');
+    if (mounted) {
+      setState(() => _syncing = false);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(res.success ? res.message : 'Erro: ${res.message}'),
+        backgroundColor: res.success ? AppTheme.successGreen : AppTheme.primaryRed,
+      ));
+      if (res.success) _load();
+    }
   }
 
   Future<void> _load() async {
@@ -73,6 +88,18 @@ class _AdminDriversScreenState extends State<AdminDriversScreen> {
                         ],
                       ),
                     ),
+                    if (_syncing)
+                      const SizedBox(
+                        width: 24, height: 24,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    else
+                      TextButton.icon(
+                        onPressed: _syncDrivers,
+                        icon: const Icon(Icons.sync, size: 16),
+                        label: Text('Sincronizar ${DateTime.now().year}'),
+                        style: TextButton.styleFrom(foregroundColor: AppTheme.primaryRed),
+                      ),
                     IconButton(onPressed: _load, icon: const Icon(Icons.refresh)),
                   ],
                 ),

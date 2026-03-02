@@ -2,7 +2,7 @@ const { Router } = require('express');
 const {
   getDashboardStats,
   getTeams, createTeam, updateTeam, deleteTeam, uploadTeamLogo,
-  getDrivers, createDriver, updateDriver, deleteDriver, uploadDriverPhoto,
+  getDrivers, createDriver, updateDriver, deleteDriver, uploadDriverPhoto, syncDriversAndTeams,
   getRaces, createRace, updateRace, deleteRace, syncRaceSchedule,
   createRaceResults, calculateScores,
   getOfficialLeagues, createOfficialLeague, updateOfficialLeague, deleteOfficialLeague, seedOfficialLeagues,
@@ -36,6 +36,7 @@ router.post('/teams/:id/logo', upload.single('logo'), uploadTeamLogo);
 
 // Pilotos
 router.get('/drivers', getDrivers);
+router.post('/drivers/sync', syncDriversAndTeams);
 router.post('/drivers', validate(createDriverSchema), createDriver);
 router.put('/drivers/:id', validate(updateDriverSchema), updateDriver);
 router.delete('/drivers/:id', deleteDriver);

@@ -634,13 +634,79 @@ async function syncRaceSchedule(req, res, next) {
   }
 }
 
+// POST /api/v1/admin/drivers/sync?year=2026
+// Busca equipes e pilotos da Jolpica e faz upsert no banco
+async function syncDriversAndTeams(req, res, next) {
+  try {
+    const year = parseInt(req.query.year) || new Date().getFullYear();
+
+    // 1. Busca todas as equipes do ano
+    const constData = await fetchJolpica(`https://api.jolpi.ca/ergast/f1/${year}/constructors.json`);
+    const constructors = constData.MRData?.ConstructorTable?.Constructors || [];
+
+    if (constructors.length === 0) {
+      return res.status(404).json(errorResponse(`Nenhuma equipe encontrada na Jolpica para ${year}`));
+    }
+
+    let teamsUpserted = 0;
+    let driversUpserted = 0;
+
+    for (const c of constructors) {
+      // Upsert da equipe
+      const teamResult = await pool.query(
+        `INSERT INTO teams (name) VALUES ($1)
+         ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name
+         RETURNING id`,
+        [c.name]
+      );
+      const teamId = teamResult.rows[0].id;
+      teamsUpserted++;
+
+      // Busca pilotos desta equipe no ano
+      const drvData = await fetchJolpica(
+        `https://api.jolpi.ca/ergast/f1/${year}/constructors/${c.constructorId}/drivers.json`
+      );
+      const drivers = drvData.MRData?.DriverTable?.Drivers || [];
+
+      for (const d of drivers) {
+        const number = d.permanentNumber ? parseInt(d.permanentNumber) : null;
+        const nationality = (d.nationality || '').substring(0, 3).toUpperCase();
+
+        await pool.query(
+          `INSERT INTO drivers (first_name, last_name, number, nationality, team_id, is_active)
+           VALUES ($1, $2, $3, $4, $5, true)
+           ON CONFLICT (id) DO NOTHING`,
+          [d.givenName, d.familyName, number, nationality, teamId]
+        );
+
+        // Verifica se já existe pelo nome e atualiza team_id
+        await pool.query(
+          `UPDATE drivers SET team_id = $1, is_active = true, updated_at = NOW()
+           WHERE first_name = $2 AND last_name = $3`,
+          [teamId, d.givenName, d.familyName]
+        );
+
+        driversUpserted++;
+      }
+    }
+
+    logger.info(`Sync drivers/teams ${year}: ${teamsUpserted} equipes, ${driversUpserted} pilotos`);
+    res.json(successResponse(
+      { year, teamsUpserted, driversUpserted },
+      `${teamsUpserted} equipes e ${driversUpserted} pilotos sincronizados`
+    ));
+  } catch (error) {
+    next(error);
+  }
+}
+
 module.exports = {
   // Dashboard
   getDashboardStats,
   // Teams
   getTeams, createTeam, updateTeam, deleteTeam, uploadTeamLogo,
   // Drivers
-  getDrivers, createDriver, updateDriver, deleteDriver, uploadDriverPhoto,
+  getDrivers, createDriver, updateDriver, deleteDriver, uploadDriverPhoto, syncDriversAndTeams,
   // Races
   getRaces, createRace, updateRace, deleteRace, syncRaceSchedule,
   // Results
