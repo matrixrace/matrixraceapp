@@ -1,11 +1,11 @@
 {
-    "name": "f1_predictions",
-    "short_name": "f1_predictions",
+    "name": "Matrix Race",
+    "short_name": "Matrix Race",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#000000",
+    "theme_color": "#000000",
+    "description": "Sistema de palpites para corridas de Fórmula 1",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [
