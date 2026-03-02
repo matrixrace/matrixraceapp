@@ -57,30 +57,10 @@ class _MainShellState extends State<MainShell> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 30,
-              height: 30,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              padding: const EdgeInsets.all(3),
-              child: Image.asset(
-                'assets/images/logo.png',
-                fit: BoxFit.contain,
-                errorBuilder: (context, error, stack) => const Icon(
-                  Icons.flag_rounded,
-                  size: 24,
-                  color: AppTheme.primaryRed,
-                ),
-              ),
-            ),
-            const SizedBox(width: 10),
-            const Text('Matrix Race'),
-          ],
+        title: Image.asset(
+          'assets/images/logo_banner.png',
+          height: 38,
+          fit: BoxFit.contain,
         ),
         actions: [
           // Sino de notificações com badge
