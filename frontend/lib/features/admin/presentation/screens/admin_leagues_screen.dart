@@ -14,11 +14,25 @@ class _AdminLeaguesScreenState extends State<AdminLeaguesScreen> {
   final ApiClient _api = ApiClient();
   List<dynamic> _leagues = [];
   bool _loading = true;
+  bool _seeding = false;
 
   @override
   void initState() {
     super.initState();
     _load();
+  }
+
+  Future<void> _seedLeagues() async {
+    setState(() => _seeding = true);
+    final res = await _api.post('/admin/leagues/seed');
+    if (mounted) {
+      setState(() => _seeding = false);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(res.success ? res.message : 'Erro: ${res.message}'),
+        backgroundColor: res.success ? AppTheme.successGreen : AppTheme.primaryRed,
+      ));
+      if (res.success) _load();
+    }
   }
 
   Future<void> _load() async {
@@ -53,6 +67,18 @@ class _AdminLeaguesScreenState extends State<AdminLeaguesScreen> {
                         ],
                       ),
                     ),
+                    if (_seeding)
+                      const SizedBox(
+                        width: 24, height: 24,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    else
+                      TextButton.icon(
+                        onPressed: _seedLeagues,
+                        icon: const Icon(Icons.auto_awesome, size: 16),
+                        label: const Text('Criar Ligas Oficiais'),
+                        style: TextButton.styleFrom(foregroundColor: AppTheme.primaryRed),
+                      ),
                     IconButton(onPressed: _load, icon: const Icon(Icons.refresh)),
                   ],
                 ),
