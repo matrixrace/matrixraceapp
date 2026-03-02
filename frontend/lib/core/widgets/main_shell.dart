@@ -57,10 +57,13 @@ class _MainShellState extends State<MainShell> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Image.asset(
-          'assets/images/logo_banner.png',
-          height: 38,
-          fit: BoxFit.contain,
+        title: ClipRRect(
+          borderRadius: BorderRadius.circular(10),
+          child: Image.asset(
+            'assets/images/logo_banner.png',
+            height: 76,
+            fit: BoxFit.contain,
+          ),
         ),
         actions: [
           // Sino de notificações com badge
