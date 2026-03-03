@@ -1,8 +1,10 @@
+import 'dart:async';
 import 'dart:html' as html;
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../../../core/config/app_config.dart';
 import '../../../../core/network/api_client.dart';
@@ -156,25 +158,41 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
     try {
       final file = input.files!.first;
+
+      // Lê os bytes usando Completer para capturar erro do FileReader
+      final completer = Completer<Uint8List>();
       final reader = html.FileReader();
+      reader.onLoad.listen((_) {
+        final result = reader.result;
+        if (result is ByteBuffer) {
+          completer.complete(result.asUint8List());
+        } else {
+          completer.completeError('Formato inesperado ao ler arquivo');
+        }
+      });
+      reader.onError.listen((e) {
+        completer.completeError('Erro ao ler arquivo: $e');
+      });
       reader.readAsArrayBuffer(file);
-      await reader.onLoad.first;
-      final bytes = (reader.result as ByteBuffer).asUint8List();
+      final bytes = await completer.future;
 
       final token = await FirebaseAuth.instance.currentUser?.getIdToken();
-      if (token == null) throw Exception('Não autenticado');
+      if (token == null) throw Exception('Usuário não autenticado');
 
-      const baseUrl = AppConfig.apiBaseUrl;
+      // Determina o Content-Type real do arquivo para o Multer aceitar
+      final mimeStr = file.type.isNotEmpty ? file.type : 'image/jpeg';
+      final mimeType = MediaType.parse(mimeStr);
 
       final request = http.MultipartRequest(
         'POST',
-        Uri.parse('$baseUrl/auth/me/avatar'),
+        Uri.parse('${AppConfig.apiBaseUrl}/auth/me/avatar'),
       );
       request.headers['Authorization'] = 'Bearer $token';
       request.files.add(http.MultipartFile.fromBytes(
         'avatar',
         bytes,
-        filename: 'avatar.jpg',
+        filename: file.name,
+        contentType: mimeType,
       ));
 
       final streamed = await request.send();
@@ -183,7 +201,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       if (!mounted) return;
 
       if (response.statusCode == 200) {
-        // Recarrega o perfil para obter a nova URL
         final res = await _api.get('/auth/me');
         if (mounted && res.success && res.data != null) {
           setState(() {
@@ -193,13 +210,13 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         messenger.showSnackBar(const SnackBar(content: Text('Foto atualizada!')));
       } else {
         messenger.showSnackBar(
-          const SnackBar(content: Text('Erro ao fazer upload da foto')),
+          SnackBar(content: Text('Erro no upload (${response.statusCode}): ${response.body}')),
         );
       }
-    } catch (_) {
+    } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Erro ao selecionar a imagem')),
+        messenger.showSnackBar(
+          SnackBar(content: Text('Erro: $e')),
         );
       }
     } finally {
