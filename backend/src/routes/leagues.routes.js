@@ -3,7 +3,7 @@ const {
   getMyLeagues, getPublicLeagues, getLeague,
   createLeague, updateLeague, deleteLeague,
   joinLeague, joinByCode, inviteMember,
-  getMembers, removeMember,
+  getMembers, removeMember, leaveLeague,
   getPendingRequests, approveRequest, rejectRequest,
   getPublicLeaguesForPrediction,
   getLeagueRacesStatus,
@@ -49,6 +49,7 @@ router.post('/:id/join', authenticate, joinLeague);
 router.post('/:id/invite', authenticate, validate(inviteSchema), inviteMember);
 router.get('/:id/members', authenticate, getMembers);
 router.delete('/:id/members/:userId', authenticate, removeMember);
+router.delete('/:id/leave', authenticate, leaveLeague);
 
 // Corridas da liga com status de palpite do usuário
 router.get('/:id/races-status', authenticate, getLeagueRacesStatus);

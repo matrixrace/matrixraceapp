@@ -79,6 +79,45 @@ class _LeagueDetailScreenState extends State<LeagueDetailScreen>
     }
   }
 
+  Future<void> _leaveLeague() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Sair da liga'),
+        content: Text(
+          'Tem certeza que deseja sair de "${_league?['name']}"?\n\nSeu histórico de pontos será mantido, mas você perderá acesso ao mural e placar.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Sair'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    final res = await _api.delete('/leagues/${widget.leagueId}/leave');
+    if (!mounted) return;
+
+    if (res.success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Você saiu da liga')),
+      );
+      context.pop();
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(res.message), backgroundColor: Colors.red),
+      );
+    }
+  }
+
   Future<void> _showPostSettings() async {
     String selected =
         _league?['post_mode'] ?? _league?['postMode'] ?? 'all';
@@ -156,6 +195,12 @@ class _LeagueDetailScreenState extends State<LeagueDetailScreen>
         ),
         title: Text(leagueName),
         actions: [
+          if (_isMember && !_isOwner)
+            IconButton(
+              icon: const Icon(Icons.exit_to_app_outlined),
+              tooltip: 'Sair da liga',
+              onPressed: _leaveLeague,
+            ),
           if (_isOwner)
             PopupMenuButton<String>(
               icon: const Icon(Icons.settings_outlined),

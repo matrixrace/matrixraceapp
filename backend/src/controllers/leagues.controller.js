@@ -698,11 +698,47 @@ async function rejectRequest(req, res, next) {
   }
 }
 
+// DELETE /api/v1/leagues/:id/leave
+// Usuário sai de uma liga da qual é membro (dono não pode sair)
+async function leaveLeague(req, res, next) {
+  try {
+    const { id } = req.params;
+
+    const [league] = await db
+      .select()
+      .from(leagues)
+      .where(eq(leagues.id, id))
+      .limit(1);
+
+    if (!league) {
+      return next(errorResponse('Liga não encontrada', 404));
+    }
+
+    if (league.ownerId === req.user.id) {
+      return next(errorResponse('O dono da liga não pode sair. Delete a liga para encerrá-la.', 400));
+    }
+
+    const result = await pool.query(
+      `DELETE FROM league_members WHERE league_id = $1 AND user_id = $2 AND status = 'active' RETURNING id`,
+      [id, req.user.id]
+    );
+
+    if (result.rowCount === 0) {
+      return next(errorResponse('Você não é membro desta liga', 404));
+    }
+
+    logger.info(`Usuário ${req.user.email} saiu da liga ${id}`);
+    res.json(successResponse(null, 'Você saiu da liga'));
+  } catch (error) {
+    next(error);
+  }
+}
+
 module.exports = {
   getMyLeagues, getPublicLeagues, getLeague,
   createLeague, updateLeague, deleteLeague,
   joinLeague, joinByCode, inviteMember,
-  getMembers, removeMember,
+  getMembers, removeMember, leaveLeague,
   getPendingRequests, approveRequest, rejectRequest,
   getPublicLeaguesForPrediction,
   getLeagueRacesStatus,
