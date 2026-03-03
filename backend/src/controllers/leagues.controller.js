@@ -162,11 +162,18 @@ async function getLeague(req, res, next) {
     league.races = racesResult.rows;
 
     // Verifica se o usuário logado é membro desta liga
-    const memberCheck = await pool.query(
-      `SELECT 1 FROM league_members WHERE league_id = $1 AND user_id = $2 AND status = 'active' LIMIT 1`,
-      [id, req.user.id]
-    );
-    league.is_member = memberCheck.rows.length > 0;
+    const [membership] = await db
+      .select({ id: leagueMembers.id })
+      .from(leagueMembers)
+      .where(
+        and(
+          eq(leagueMembers.leagueId, id),
+          eq(leagueMembers.userId, req.user.id),
+          eq(leagueMembers.status, 'active')
+        )
+      )
+      .limit(1);
+    league.is_member = !!membership;
 
     res.json(successResponse(league));
   } catch (error) {

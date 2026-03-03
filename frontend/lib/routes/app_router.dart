@@ -73,6 +73,7 @@ class AppRouter {
         path: '/leagues/:id',
         builder: (context, state) => LeagueDetailScreen(
           leagueId: state.pathParameters['id']!,
+          isMemberHint: state.extra as bool?,
         ),
       ),
       GoRoute(

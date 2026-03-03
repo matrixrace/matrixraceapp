@@ -11,8 +11,10 @@ import '../widgets/corridas_tab.dart';
 /// Tela principal de uma liga com abas: Mural | Placar | Corridas
 class LeagueDetailScreen extends StatefulWidget {
   final String leagueId;
+  // Hint de membership vindo da tela de listagem (mais confiável que o campo is_member da API)
+  final bool? isMemberHint;
 
-  const LeagueDetailScreen({super.key, required this.leagueId});
+  const LeagueDetailScreen({super.key, required this.leagueId, this.isMemberHint});
 
   @override
   State<LeagueDetailScreen> createState() => _LeagueDetailScreenState();
@@ -67,7 +69,8 @@ class _LeagueDetailScreenState extends State<LeagueDetailScreen>
 
       _isOwner = myId == ownerId;
       _isAdmin = me?['isAdmin'] == true || me?['is_admin'] == true;
-      _isMember = league['is_member'] == true;
+      // Usa o hint da listagem (mais confiável) ou o campo da API como fallback
+      _isMember = (widget.isMemberHint ?? false) || league['is_member'] == true;
       _canPost = _isOwner || postMode == 'all';
 
       setState(() {

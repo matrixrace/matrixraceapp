@@ -340,7 +340,7 @@ class _LeaguesScreenState extends State<LeaguesScreen> {
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       child: InkWell(
-        onTap: () => context.push('/leagues/${league['id']}'),
+        onTap: () => context.push('/leagues/${league['id']}', extra: isMember),
         borderRadius: BorderRadius.circular(12),
         child: Padding(
           padding: const EdgeInsets.all(16),
