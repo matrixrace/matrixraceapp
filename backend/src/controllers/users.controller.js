@@ -61,17 +61,14 @@ async function getUserProfile(req, res, next) {
       return next(errorResponse('Usuário não encontrado', 404));
     }
 
-    // Verifica se são amigos
+    // Busca qualquer amizade (pending ou accepted) entre os dois usuários
     const [friendship] = await db
       .select()
       .from(friendships)
       .where(
-        and(
-          eq(friendships.status, 'accepted'),
-          or(
-            and(eq(friendships.requesterId, req.user.id), eq(friendships.addresseeId, id)),
-            and(eq(friendships.requesterId, id), eq(friendships.addresseeId, req.user.id))
-          )
+        or(
+          and(eq(friendships.requesterId, req.user.id), eq(friendships.addresseeId, id)),
+          and(eq(friendships.requesterId, id), eq(friendships.addresseeId, req.user.id))
         )
       )
       .limit(1);
