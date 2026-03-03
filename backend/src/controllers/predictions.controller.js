@@ -5,6 +5,31 @@ const { successResponse, errorResponse } = require('../utils/helpers');
 const logger = require('../utils/logger');
 const { fetchJolpica } = require('../utils/jolpica');
 
+// Busca um setting do sistema (retorna valor padrão se não existir)
+async function getSystemSetting(key, defaultValue) {
+  const result = await pool.query('SELECT value FROM system_settings WHERE key = $1', [key]);
+  return result.rows.length > 0 ? parseInt(result.rows[0].value, 10) : defaultValue;
+}
+
+// Query reutilizável: conta ligas ativas do usuário (exclui ligas onde todas as corridas terminaram)
+async function countActiveLeagues(userId) {
+  const result = await pool.query(
+    `SELECT COUNT(*) as total FROM league_members lm
+     JOIN leagues l ON l.id = lm.league_id
+     WHERE lm.user_id = $1 AND lm.status = 'active'
+     AND (
+       NOT EXISTS (SELECT 1 FROM league_races lr WHERE lr.league_id = l.id)
+       OR EXISTS (
+         SELECT 1 FROM league_races lr
+         JOIN races r ON r.id = lr.race_id
+         WHERE lr.league_id = l.id AND r.is_completed = false
+       )
+     )`,
+    [userId]
+  );
+  return parseInt(result.rows[0].total, 10);
+}
+
 // Mapeia lock_type para max_points_per_driver
 const LOCK_TYPE_POINTS = {
   fp1: 20,
@@ -146,7 +171,7 @@ async function applyPredictionToLeagues(req, res, next) {
     for (const leagueId of leagueIds) {
       // Busca informações da liga
       const leagueInfo = await pool.query(
-        `SELECT id, is_official, is_public, requires_approval FROM leagues WHERE id = $1`,
+        `SELECT id, name, is_official, is_public, requires_approval FROM leagues WHERE id = $1`,
         [leagueId]
       );
 
@@ -164,8 +189,15 @@ async function applyPredictionToLeagues(req, res, next) {
       );
 
       if (memberCheck.rowCount === 0) {
-        // Auto-join: ligas oficiais OU ligas públicas sem aprovação
+        // Auto-join: ligas públicas sem aprovação (usuário ainda não é membro)
         if (league.is_public && !league.requires_approval) {
+          // Verifica limite de ligas simultâneas antes de entrar
+          const maxJoin = await getSystemSetting('max_leagues_join', 10);
+          const activeCount = await countActiveLeagues(userId);
+          if (activeCount >= maxJoin) {
+            errors.push(`Limite de ${maxJoin} ligas simultâneas atingido — não foi possível entrar em "${league.name ?? leagueId}"`);
+            continue;
+          }
           await pool.query(
             `INSERT INTO league_members (league_id, user_id, status) VALUES ($1, $2, 'active') ON CONFLICT DO NOTHING`,
             [leagueId, userId]
