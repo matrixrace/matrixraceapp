@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:html' as html;
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
@@ -159,21 +160,22 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     try {
       final file = input.files!.first;
 
-      // Lê os bytes usando Completer para capturar erro do FileReader
+      // Lê como data URL (base64) — funciona em todas as versões do Flutter Web
       final completer = Completer<Uint8List>();
       final reader = html.FileReader();
       reader.onLoad.listen((_) {
-        final result = reader.result;
-        if (result is ByteBuffer) {
-          completer.complete(result.asUint8List());
-        } else {
-          completer.completeError('Formato inesperado ao ler arquivo');
+        try {
+          final dataUrl = reader.result as String;
+          final base64Data = dataUrl.split(',').last;
+          completer.complete(base64.decode(base64Data));
+        } catch (e) {
+          completer.completeError('Erro ao decodificar imagem: $e');
         }
       });
       reader.onError.listen((e) {
         completer.completeError('Erro ao ler arquivo: $e');
       });
-      reader.readAsArrayBuffer(file);
+      reader.readAsDataUrl(file);
       final bytes = await completer.future;
 
       final token = await FirebaseAuth.instance.currentUser?.getIdToken();
