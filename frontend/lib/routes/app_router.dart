@@ -20,8 +20,6 @@ import '../features/notifications/presentation/screens/notifications_screen.dart
 import '../features/leagues/presentation/screens/league_detail_screen.dart';
 import '../features/f1results/presentation/screens/f1_results_screen.dart';
 import '../features/profile/presentation/screens/user_profile_screen.dart';
-import '../features/admin/presentation/screens/admin_ai_order_screen.dart';
-import '../features/admin/presentation/screens/admin_users_screen.dart';
 import '../features/admin/presentation/screens/admin_user_leagues_screen.dart';
 
 /// Configuração de rotas do app

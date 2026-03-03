@@ -4,9 +4,9 @@ import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/app_theme.dart';
 
 /// Tela de perfil de outro usuário (somente leitura)
+/// Mostra status de amizade e permite solicitar/aceitar/cancelar amizade.
 class UserProfileScreen extends StatefulWidget {
   final String userId;
-
   const UserProfileScreen({super.key, required this.userId});
 
   @override
@@ -17,6 +17,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
   final ApiClient _api = ApiClient();
   Map<String, dynamic>? _profile;
   bool _isLoading = true;
+  bool _actionLoading = false;
 
   @override
   void initState() {
@@ -25,6 +26,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
   }
 
   Future<void> _load() async {
+    setState(() => _isLoading = true);
     final res = await _api.get('/users/${widget.userId}');
     if (mounted) {
       setState(() {
@@ -35,6 +37,47 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
       });
     }
   }
+
+  // ── Ações de amizade ──────────────────────────────────────
+
+  Future<void> _sendRequest() async {
+    setState(() => _actionLoading = true);
+    final res = await _api.post('/friends/request/${widget.userId}');
+    if (mounted) {
+      setState(() => _actionLoading = false);
+      if (res.success) {
+        await _load();
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(res.message), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
+  Future<void> _cancelRequest() async {
+    final friendshipId = _profile?['friendshipId'];
+    if (friendshipId == null) return;
+    setState(() => _actionLoading = true);
+    final res = await _api.delete('/friends/$friendshipId');
+    if (mounted) {
+      setState(() => _actionLoading = false);
+      if (res.success) await _load();
+    }
+  }
+
+  Future<void> _acceptRequest() async {
+    final friendshipId = _profile?['friendshipId'];
+    if (friendshipId == null) return;
+    setState(() => _actionLoading = true);
+    final res = await _api.put('/friends/$friendshipId/accept');
+    if (mounted) {
+      setState(() => _actionLoading = false);
+      if (res.success) await _load();
+    }
+  }
+
+  // ── Build ─────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
@@ -52,16 +95,19 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     final profile = _profile!;
     final avatarUrl = profile['avatarUrl'] as String?;
     final name = profile['displayName'] as String? ?? '?';
+    final friendshipStatus = profile['friendshipStatus'] as String? ?? 'none';
+    final isFriend = friendshipStatus == 'friends';
+
+    // Campos extras só disponíveis para amigos
     final bio = profile['bio'] as String?;
     final stats = profile['stats'] as Map<String, dynamic>?;
     final leagues = profile['leagues'] as List?;
-    final isFriend = profile['isFriend'] == true;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Column(
         children: [
-          // Avatar
+          // ── Avatar ────────────────────────────────────────
           CircleAvatar(
             radius: 48,
             backgroundColor: AppTheme.surfaceColor,
@@ -78,27 +124,20 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                   )
                 : null,
           ),
+          const SizedBox(height: 14),
+
+          // ── Nome ──────────────────────────────────────────
+          Text(name,
+              style: const TextStyle(
+                  fontSize: 22, fontWeight: FontWeight.bold)),
           const SizedBox(height: 16),
 
-          // Nome
-          Text(
-            name,
-            style: const TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 4),
+          // ── Botão de amizade ──────────────────────────────
+          _buildFriendshipButton(friendshipStatus),
 
-          if (!isFriend)
-            const Text(
-              'Adicione como amigo para ver mais detalhes',
-              style: TextStyle(color: AppTheme.textSecondary, fontSize: 12),
-            ),
-
-          // Bio (apenas para amigos)
-          if (bio != null && bio.isNotEmpty) ...[
-            const SizedBox(height: 16),
+          // ── Bio ───────────────────────────────────────────
+          if (isFriend && bio != null && bio.isNotEmpty) ...[
+            const SizedBox(height: 20),
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(14),
@@ -106,12 +145,13 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                 color: AppTheme.cardBackground,
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: Text(bio, style: const TextStyle(color: AppTheme.textSecondary)),
+              child: Text(bio,
+                  style: const TextStyle(color: AppTheme.textSecondary)),
             ),
           ],
 
-          // Stats (apenas para amigos)
-          if (stats != null) ...[
+          // ── Stats ─────────────────────────────────────────
+          if (isFriend && stats != null) ...[
             const SizedBox(height: 20),
             Row(
               children: [
@@ -136,31 +176,95 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
             ),
           ],
 
-          // Ligas (apenas para amigos)
-          if (leagues != null && leagues.isNotEmpty) ...[
+          // ── Ligas ─────────────────────────────────────────
+          if (isFriend && leagues != null && leagues.isNotEmpty) ...[
             const SizedBox(height: 20),
             Align(
               alignment: Alignment.centerLeft,
-              child: Text(
-                'Ligas',
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
+              child: Text('Ligas',
+                  style: Theme.of(context).textTheme.titleMedium),
             ),
             const SizedBox(height: 8),
             ...leagues.map((l) => ListTile(
                   dense: true,
                   contentPadding: EdgeInsets.zero,
                   leading: Icon(
-                    l['isPublic'] == true ? Icons.lock_open : Icons.lock_outline,
+                    l['isPublic'] == true
+                        ? Icons.lock_open
+                        : Icons.lock_outline,
                     size: 18,
                     color: AppTheme.textSecondary,
                   ),
                   title: Text(l['leagueName'] ?? ''),
                 )),
           ],
+
+          // ── Aviso quando não são amigos ───────────────────
+          if (!isFriend) ...[
+            const SizedBox(height: 24),
+            const Text(
+              'Adicione como amigo para ver o perfil completo',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+            ),
+          ],
         ],
       ),
     );
+  }
+
+  Widget _buildFriendshipButton(String status) {
+    if (_actionLoading) {
+      return const SizedBox(
+        height: 36,
+        width: 36,
+        child: CircularProgressIndicator(strokeWidth: 2),
+      );
+    }
+
+    switch (status) {
+      case 'friends':
+        return OutlinedButton.icon(
+          icon: const Icon(Icons.check, size: 16),
+          label: const Text('Amigos'),
+          onPressed: null, // já são amigos
+          style: OutlinedButton.styleFrom(
+            foregroundColor: AppTheme.successGreen,
+            side: const BorderSide(color: AppTheme.successGreen),
+          ),
+        );
+
+      case 'pending_sent':
+        // U1 enviou pedido para U2 — aguardando. Clica para cancelar.
+        return OutlinedButton.icon(
+          icon: const Icon(Icons.hourglass_top, size: 16),
+          label: const Text('Aguardando... (toque para cancelar)'),
+          onPressed: _cancelRequest,
+          style: OutlinedButton.styleFrom(
+            foregroundColor: AppTheme.textSecondary,
+            side: const BorderSide(color: AppTheme.textSecondary),
+          ),
+        );
+
+      case 'pending_received':
+        // U2 enviou pedido para U1 — U1 pode aprovar.
+        return ElevatedButton.icon(
+          icon: const Icon(Icons.person_add, size: 16),
+          label: const Text('Aprovar Amizade'),
+          onPressed: _acceptRequest,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppTheme.successGreen,
+            foregroundColor: Colors.white,
+          ),
+        );
+
+      default: // 'none'
+        return ElevatedButton.icon(
+          icon: const Icon(Icons.person_add, size: 16),
+          label: const Text('Solicitar Amizade'),
+          onPressed: _sendRequest,
+        );
+    }
   }
 }
 
@@ -190,11 +294,9 @@ class _StatBox extends StatelessWidget {
         children: [
           Icon(icon, color: color, size: 20),
           const SizedBox(height: 6),
-          Text(
-            value,
-            style: TextStyle(
-                fontSize: 20, fontWeight: FontWeight.bold, color: color),
-          ),
+          Text(value,
+              style: TextStyle(
+                  fontSize: 20, fontWeight: FontWeight.bold, color: color)),
           Text(label,
               style: const TextStyle(
                   fontSize: 11, color: AppTheme.textSecondary)),

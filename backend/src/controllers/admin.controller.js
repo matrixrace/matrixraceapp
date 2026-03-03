@@ -19,7 +19,7 @@ async function getDashboardStats(req, res, next) {
         (SELECT COUNT(*) FROM users) as total_users,
         (SELECT COUNT(*) FROM races) as total_races,
         (SELECT COUNT(*) FROM races WHERE is_completed = true) as completed_races,
-        (SELECT COUNT(*) FROM leagues) as total_leagues,
+        (SELECT COUNT(*) FROM leagues WHERE is_official = false) as total_leagues,
         (SELECT COUNT(*) FROM leagues WHERE is_official = true) as official_leagues,
         (SELECT COUNT(DISTINCT (user_id, race_id)) FROM predictions) as total_predictions,
         (SELECT COUNT(*) FROM league_members) as total_memberships

@@ -1,7 +1,8 @@
+import 'dart:html' as html;
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:http/http.dart' as http;
-import 'package:image_picker/image_picker.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../../../core/config/app_config.dart';
 import '../../../../core/network/api_client.dart';
@@ -135,19 +136,31 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   Future<void> _pickAndUploadAvatar() async {
     final messenger = ScaffoldMessenger.of(context);
-    final picker = ImagePicker();
-    final picked = await picker.pickImage(
-      source: ImageSource.gallery,
-      maxWidth: 600,
-      maxHeight: 600,
-      imageQuality: 85,
-    );
-    if (picked == null || !mounted) return;
+
+    // Abre o seletor de arquivo nativo do browser (dart:html)
+    final input = html.FileUploadInputElement()..accept = 'image/*';
+    html.document.body?.append(input);
+    input.click();
+
+    try {
+      await input.onChange.first.timeout(const Duration(minutes: 1));
+    } catch (_) {
+      input.remove();
+      return;
+    }
+    input.remove();
+
+    if (input.files == null || input.files!.isEmpty || !mounted) return;
 
     setState(() => _isUploadingAvatar = true);
 
     try {
-      final bytes = await picked.readAsBytes();
+      final file = input.files!.first;
+      final reader = html.FileReader();
+      reader.readAsArrayBuffer(file);
+      await reader.onLoad.first;
+      final bytes = (reader.result as ByteBuffer).asUint8List();
+
       final token = await FirebaseAuth.instance.currentUser?.getIdToken();
       if (token == null) throw Exception('Não autenticado');
 

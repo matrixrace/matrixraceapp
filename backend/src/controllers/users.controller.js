@@ -76,15 +76,31 @@ async function getUserProfile(req, res, next) {
       )
       .limit(1);
 
-    const isFriend = !!friendship;
     const isOwnProfile = req.user.id === id;
+
+    // Determina o status de amizade detalhado
+    let friendshipStatus = 'none';
+    let friendshipId = null;
+    if (friendship) {
+      friendshipId = friendship.id;
+      if (friendship.status === 'accepted') {
+        friendshipStatus = 'friends';
+      } else if (friendship.status === 'pending') {
+        friendshipStatus = friendship.requesterId === req.user.id
+          ? 'pending_sent'
+          : 'pending_received';
+      }
+    }
+
+    const isFriend = friendshipStatus === 'friends';
 
     // Perfil básico (visível para todos)
     const profile = {
       id: targetUser.id,
       displayName: targetUser.displayName,
       avatarUrl: targetUser.avatarUrl,
-      isFriend,
+      friendshipStatus,
+      friendshipId,
     };
 
     // Detalhes extras (apenas para amigos ou para si mesmo)

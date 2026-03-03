@@ -91,6 +91,8 @@ class _AdminAiOrderScreenState extends State<AdminAiOrderScreen> {
 
   Future<void> _save() async {
     if (_selectedRace == null) return;
+    // Captura antes de qualquer await para evitar async gap com BuildContext
+    final messenger = ScaffoldMessenger.of(context);
     setState(() => _saving = true);
 
     final order = _orderedDrivers
@@ -99,19 +101,17 @@ class _AdminAiOrderScreenState extends State<AdminAiOrderScreen> {
         .map((e) => {'driverId': e.value['id'], 'position': e.key + 1})
         .toList();
 
-    final raceId = _selectedRace['id'].toString();
+    final raceId = (_selectedRace['id'] as int).toString();
     final res = await _api.put('/admin/races/$raceId/ai-order',
         body: {'order': order});
 
-    if (mounted) {
-      setState(() => _saving = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(res.success ? 'Ordem salva com sucesso!' : res.message),
-          backgroundColor: res.success ? AppTheme.successGreen : Colors.red,
-        ),
-      );
-    }
+    if (mounted) setState(() => _saving = false);
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(res.success ? 'Ordem salva com sucesso!' : res.message),
+        backgroundColor: res.success ? AppTheme.successGreen : Colors.red,
+      ),
+    );
   }
 
   @override
