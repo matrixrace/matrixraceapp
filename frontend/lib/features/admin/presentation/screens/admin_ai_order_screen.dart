@@ -191,7 +191,8 @@ class _AdminAiOrderScreenState extends State<AdminAiOrderScreen> {
                   },
                   itemBuilder: (context, index) {
                     final driver = _orderedDrivers[index];
-                    final photoUrl = driver['photoUrl'] as String?;
+                    final photoUrl = driver['photo_url'] as String?;
+                    final name = '${driver['first_name'] ?? ''} ${driver['last_name'] ?? ''}'.trim();
                     return ListTile(
                       key: ValueKey(driver['id']),
                       contentPadding:
@@ -225,9 +226,9 @@ class _AdminAiOrderScreenState extends State<AdminAiOrderScreen> {
                           ),
                         ],
                       ),
-                      title: Text(driver['name'] ?? ''),
+                      title: Text(name),
                       subtitle: Text(
-                        driver['team'] ?? '',
+                        driver['team_name'] ?? '',
                         style: const TextStyle(fontSize: 12),
                       ),
                       trailing: const Icon(Icons.drag_handle,
