@@ -58,7 +58,11 @@ async function uploadAvatar(req, res, next) {
       return next(errorResponse('Nenhuma imagem enviada', 400));
     }
 
-    const { url } = await uploadImage(req.file.buffer, 'avatars', { width: 300, height: 300 });
+    const { url } = await uploadImage(req.file.buffer, 'avatars', {
+      width: 300,
+      height: 300,
+      mimeType: req.file.mimetype,
+    });
 
     const [updated] = await db
       .update(users)

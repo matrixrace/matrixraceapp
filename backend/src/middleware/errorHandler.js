@@ -11,17 +11,10 @@ function errorHandler(err, req, res, _next) {
     method: req.method,
   });
 
-  // Em desenvolvimento mostra detalhes do erro; em produção esconde
   const response = {
     success: false,
-    message: config.nodeEnv === 'production'
-      ? 'Erro interno do servidor'
-      : err.message,
+    message: err.message || 'Erro interno do servidor',
   };
-
-  if (config.nodeEnv !== 'production') {
-    response.stack = err.stack;
-  }
 
   const statusCode = err.statusCode || 500;
   res.status(statusCode).json(response);

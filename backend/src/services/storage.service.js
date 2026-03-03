@@ -5,9 +5,9 @@ const logger = require('../utils/logger');
 // Recebe o buffer do arquivo (da memória) e a pasta de destino
 async function uploadImage(fileBuffer, folder, options = {}) {
   try {
-    // Converte o buffer para base64 para enviar ao Cloudinary
+    const mimeType = options.mimeType || 'image/jpeg';
     const base64 = fileBuffer.toString('base64');
-    const dataUri = `data:image/png;base64,${base64}`;
+    const dataUri = `data:${mimeType};base64,${base64}`;
 
     const result = await cloudinary.uploader.upload(dataUri, {
       folder: `f1-predictions/${folder}`,
@@ -24,8 +24,8 @@ async function uploadImage(fileBuffer, folder, options = {}) {
       publicId: result.public_id,
     };
   } catch (error) {
-    logger.error('Erro ao enviar imagem:', error.message);
-    throw new Error('Falha ao enviar imagem');
+    logger.error('Erro ao enviar imagem:', error.message, error.http_code, error.error);
+    throw new Error(`Cloudinary: ${error.message || JSON.stringify(error)}`);
   }
 }
 
