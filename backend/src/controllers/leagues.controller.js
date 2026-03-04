@@ -1,7 +1,7 @@
 const { db, pool } = require('../config/database');
 const { leagues, leagueMembers, leagueRaces, invitations, users } = require('../db/schema');
 const { eq, and, desc } = require('drizzle-orm');
-const { successResponse, errorResponse, generateInviteCode } = require('../utils/helpers');
+const { successResponse, errorResponse, generateInviteCode, getSystemSetting, checkLeagueJoinLimit } = require('../utils/helpers');
 const { sendLeagueInvite } = require('../services/email.service');
 const config = require('../config/environment');
 const logger = require('../utils/logger');
@@ -181,21 +181,16 @@ async function getLeague(req, res, next) {
   }
 }
 
-// Busca um setting do sistema (retorna valor padrão se não existir)
-async function getSystemSetting(key, defaultValue) {
-  const result = await pool.query('SELECT value FROM system_settings WHERE key = $1', [key]);
-  return result.rows.length > 0 ? parseInt(result.rows[0].value, 10) : defaultValue;
-}
-
 // POST /api/v1/leagues
 // Cria uma nova liga
 async function createLeague(req, res, next) {
   try {
     const { name, description, isPublic, requiresApproval, maxMembers, raceIds } = req.body;
 
-    // Verifica limite de ligas criadas pelo usuário
+    // Verifica limites de ligas (apenas para não-admins)
     if (!req.user.isAdmin) {
-      const maxCreate = await getSystemSetting('max_leagues_create', 3);
+      // Limite de criação
+      const maxCreate = await getSystemSetting(pool, 'max_leagues_create', 3);
       const countResult = await pool.query(
         `SELECT COUNT(*) as total FROM leagues l
          WHERE l.owner_id = $1 AND l.is_official = false
@@ -211,6 +206,12 @@ async function createLeague(req, res, next) {
       );
       if (parseInt(countResult.rows[0].total) >= maxCreate) {
         return next(errorResponse(`Você atingiu o limite de ${maxCreate} ligas criadas`, 400));
+      }
+
+      // Limite de participação (criar liga = entrar nela)
+      const { allowed, maxJoin } = await checkLeagueJoinLimit(pool, req.user.id);
+      if (!allowed) {
+        return next(errorResponse(`Você atingiu o limite de ${maxJoin} ligas simultâneas`, 400));
       }
     }
 
@@ -341,23 +342,9 @@ async function joinLeague(req, res, next) {
       return next(errorResponse('Esta liga é privada. Use o código de convite.', 403));
     }
 
-    // Verifica limite de ligas que o usuário pode participar (apenas ligas ativas)
-    const maxJoin = await getSystemSetting('max_leagues_join', 10);
-    const joinCount = await pool.query(
-      `SELECT COUNT(*) as total FROM league_members lm
-       JOIN leagues l ON l.id = lm.league_id
-       WHERE lm.user_id = $1 AND lm.status = 'active'
-       AND (
-         NOT EXISTS (SELECT 1 FROM league_races lr WHERE lr.league_id = l.id)
-         OR EXISTS (
-           SELECT 1 FROM league_races lr
-           JOIN races r ON r.id = lr.race_id
-           WHERE lr.league_id = l.id AND r.is_completed = false
-         )
-       )`,
-      [req.user.id]
-    );
-    if (parseInt(joinCount.rows[0].total) >= maxJoin) {
+    // Verifica limite de ligas simultâneas
+    const { allowed, maxJoin } = await checkLeagueJoinLimit(pool, req.user.id);
+    if (!allowed) {
       return next(errorResponse(`Você atingiu o limite de ${maxJoin} ligas`, 400));
     }
 
@@ -412,23 +399,9 @@ async function joinByCode(req, res, next) {
       return next(errorResponse('Código de convite inválido', 404));
     }
 
-    // Verifica limite de ligas que o usuário pode participar (apenas ligas ativas)
-    const maxJoin = await getSystemSetting('max_leagues_join', 10);
-    const joinCount = await pool.query(
-      `SELECT COUNT(*) as total FROM league_members lm
-       JOIN leagues l ON l.id = lm.league_id
-       WHERE lm.user_id = $1 AND lm.status = 'active'
-       AND (
-         NOT EXISTS (SELECT 1 FROM league_races lr WHERE lr.league_id = l.id)
-         OR EXISTS (
-           SELECT 1 FROM league_races lr
-           JOIN races r ON r.id = lr.race_id
-           WHERE lr.league_id = l.id AND r.is_completed = false
-         )
-       )`,
-      [req.user.id]
-    );
-    if (parseInt(joinCount.rows[0].total) >= maxJoin) {
+    // Verifica limite de ligas simultâneas
+    const { allowed, maxJoin } = await checkLeagueJoinLimit(pool, req.user.id);
+    if (!allowed) {
       return next(errorResponse(`Você atingiu o limite de ${maxJoin} ligas`, 400));
     }
 

@@ -1,34 +1,9 @@
 const { db, pool } = require('../config/database');
 const { predictions, predictionApplications, races, leagueMembers, leagueRaces } = require('../db/schema');
 const { eq, and } = require('drizzle-orm');
-const { successResponse, errorResponse } = require('../utils/helpers');
+const { successResponse, errorResponse, checkLeagueJoinLimit } = require('../utils/helpers');
 const logger = require('../utils/logger');
 const { fetchJolpica } = require('../utils/jolpica');
-
-// Busca um setting do sistema (retorna valor padrão se não existir)
-async function getSystemSetting(key, defaultValue) {
-  const result = await pool.query('SELECT value FROM system_settings WHERE key = $1', [key]);
-  return result.rows.length > 0 ? parseInt(result.rows[0].value, 10) : defaultValue;
-}
-
-// Query reutilizável: conta ligas ativas do usuário (exclui ligas onde todas as corridas terminaram)
-async function countActiveLeagues(userId) {
-  const result = await pool.query(
-    `SELECT COUNT(*) as total FROM league_members lm
-     JOIN leagues l ON l.id = lm.league_id
-     WHERE lm.user_id = $1 AND lm.status = 'active'
-     AND (
-       NOT EXISTS (SELECT 1 FROM league_races lr WHERE lr.league_id = l.id)
-       OR EXISTS (
-         SELECT 1 FROM league_races lr
-         JOIN races r ON r.id = lr.race_id
-         WHERE lr.league_id = l.id AND r.is_completed = false
-       )
-     )`,
-    [userId]
-  );
-  return parseInt(result.rows[0].total, 10);
-}
 
 // Mapeia lock_type para max_points_per_driver
 const LOCK_TYPE_POINTS = {
@@ -192,9 +167,8 @@ async function applyPredictionToLeagues(req, res, next) {
         // Auto-join: ligas públicas sem aprovação (usuário ainda não é membro)
         if (league.is_public && !league.requires_approval) {
           // Verifica limite de ligas simultâneas antes de entrar
-          const maxJoin = await getSystemSetting('max_leagues_join', 10);
-          const activeCount = await countActiveLeagues(userId);
-          if (activeCount >= maxJoin) {
+          const { allowed, maxJoin } = await checkLeagueJoinLimit(pool, userId);
+          if (!allowed) {
             errors.push(`Limite de ${maxJoin} ligas simultâneas atingido — não foi possível entrar em "${league.name ?? leagueId}"`);
             continue;
           }
@@ -202,6 +176,7 @@ async function applyPredictionToLeagues(req, res, next) {
             `INSERT INTO league_members (league_id, user_id, status) VALUES ($1, $2, 'active') ON CONFLICT DO NOTHING`,
             [leagueId, userId]
           );
+          logger.info(`Auto-join: userId=${userId} entrou na liga ${leagueId} via aplicação de palpite`);
         } else {
           errors.push(`Você não é membro de uma das ligas informadas`);
           continue;

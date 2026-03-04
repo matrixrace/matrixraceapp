@@ -77,19 +77,22 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
 
     setState(() => _savingSettings = true);
 
-    await Future.wait([
+    final results = await Future.wait([
       _api.put('/admin/settings', body: {'key': 'max_leagues_join', 'value': '$joinVal'}),
       _api.put('/admin/settings', body: {'key': 'max_leagues_create', 'value': '$createVal'}),
     ]);
 
     if (mounted) {
       setState(() => _savingSettings = false);
+      final allSuccess = results.every((r) => r.success);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Limites atualizados!'),
-          backgroundColor: AppTheme.successGreen,
+        SnackBar(
+          content: Text(allSuccess ? 'Limites atualizados!' : 'Erro ao salvar: ${results.firstWhere((r) => !r.success).message}'),
+          backgroundColor: allSuccess ? AppTheme.successGreen : Colors.red,
         ),
       );
+      // Recarrega do backend para confirmar os valores salvos
+      if (allSuccess) _loadSettings();
     }
   }
 
