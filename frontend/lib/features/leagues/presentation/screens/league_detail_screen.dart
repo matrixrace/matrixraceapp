@@ -33,6 +33,7 @@ class _LeagueDetailScreenState extends State<LeagueDetailScreen>
   bool _isLoading = true;
   bool _isAdmin = false;
   bool _isMember = false;
+  bool _isJoining = false;
 
   @override
   void initState() {
@@ -121,6 +122,57 @@ class _LeagueDetailScreenState extends State<LeagueDetailScreen>
     }
   }
 
+  Future<void> _joinLeague() async {
+    setState(() => _isJoining = true);
+
+    final res = await _api.post('/leagues/${widget.leagueId}/join');
+
+    if (!mounted) return;
+    setState(() => _isJoining = false);
+
+    if (res.success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Você entrou na liga!'), backgroundColor: Colors.green),
+      );
+      // Recarrega para exibir as tabs
+      setState(() {
+        _isMember = true;
+        _isLoading = true;
+      });
+      await _init();
+    } else {
+      final msg = res.message.toLowerCase();
+      if (msg.contains('limite')) {
+        await showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Row(
+              children: [
+                Icon(Icons.info_outline, color: Colors.orange, size: 24),
+                SizedBox(width: 8),
+                Expanded(child: Text('Limite de ligas atingido')),
+              ],
+            ),
+            content: const Text(
+              'Você atingiu o limite de ligas simultâneas e não foi possível entrar nesta liga.\n\n'
+              'Quando as corridas de uma liga que você participa forem finalizadas, ela será desativada e você poderá entrar em novas ligas.',
+            ),
+            actions: [
+              ElevatedButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: const Text('Entendi'),
+              ),
+            ],
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(res.message), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
   Future<void> _showPostSettings() async {
     String selected =
         _league?['post_mode'] ?? _league?['postMode'] ?? 'all';
@@ -184,11 +236,111 @@ class _LeagueDetailScreenState extends State<LeagueDetailScreen>
     );
   }
 
+  Widget _buildJoinView() {
+    final league = _league;
+    if (league == null) return const SizedBox.shrink();
+
+    final isPublic = league['is_public'] == true || league['isPublic'] == true;
+    final requiresApproval = league['requires_approval'] == true || league['requiresApproval'] == true;
+    final memberCount = league['member_count'] ?? league['memberCount'] ?? 0;
+    final description = league['description'] as String?;
+
+    return Center(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              isPublic ? Icons.groups_outlined : Icons.lock_outline,
+              size: 64,
+              color: AppTheme.textSecondary,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              league['name'] ?? '',
+              style: Theme.of(context).textTheme.headlineSmall,
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '$memberCount membros',
+              style: const TextStyle(color: AppTheme.textSecondary, fontSize: 14),
+            ),
+            if (description != null && description.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Text(
+                description,
+                style: const TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+                textAlign: TextAlign.center,
+              ),
+            ],
+            const SizedBox(height: 32),
+            if (isPublic) ...[
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: _isJoining ? null : _joinLeague,
+                  icon: _isJoining
+                      ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                      : Icon(requiresApproval ? Icons.how_to_reg : Icons.login),
+                  label: Text(_isJoining
+                      ? 'Aguarde...'
+                      : requiresApproval
+                          ? 'Solicitar Entrada'
+                          : 'Entrar na Liga'),
+                  style: ElevatedButton.styleFrom(minimumSize: const Size(double.infinity, 52)),
+                ),
+              ),
+              if (requiresApproval) ...[
+                const SizedBox(height: 8),
+                const Text(
+                  'O líder da liga precisará aprovar sua entrada.',
+                  style: TextStyle(color: AppTheme.textSecondary, fontSize: 12),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ] else ...[
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: AppTheme.cardBackground,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.grey.withValues(alpha: 0.3)),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(Icons.lock_outline, color: AppTheme.textSecondary, size: 20),
+                    SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        'Liga privada — peça o código de convite ao líder da liga.',
+                        style: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+            const SizedBox(height: 16),
+            TextButton.icon(
+              onPressed: () => context.pop(),
+              icon: const Icon(Icons.arrow_back, size: 16),
+              label: const Text('Voltar'),
+              style: TextButton.styleFrom(foregroundColor: AppTheme.textSecondary),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final leagueName =
         _league?['name'] as String? ?? 'Liga';
     final showAdminBanner = _isAdmin && !_isMember;
+    final showTabs = _isMember || _isAdmin;
 
     return Scaffold(
       appBar: AppBar(
@@ -245,67 +397,71 @@ class _LeagueDetailScreenState extends State<LeagueDetailScreen>
               ],
             ),
         ],
-        bottom: TabBar(
-          controller: _tabController,
-          indicatorColor: AppTheme.primaryRed,
-          labelColor: AppTheme.primaryRed,
-          unselectedLabelColor: AppTheme.textSecondary,
-          labelStyle:
-              const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-          tabs: const [
-            Tab(text: 'Mural'),
-            Tab(text: 'Placar'),
-            Tab(text: 'Corridas'),
-          ],
-        ),
+        bottom: showTabs
+            ? TabBar(
+                controller: _tabController,
+                indicatorColor: AppTheme.primaryRed,
+                labelColor: AppTheme.primaryRed,
+                unselectedLabelColor: AppTheme.textSecondary,
+                labelStyle:
+                    const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                tabs: const [
+                  Tab(text: 'Mural'),
+                  Tab(text: 'Placar'),
+                  Tab(text: 'Corridas'),
+                ],
+              )
+            : null,
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : Column(
-              children: [
-                // Banner "Visualizando como Admin"
-                if (showAdminBanner)
-                  Container(
-                    width: double.infinity,
-                    color: Colors.red.shade900,
-                    padding: const EdgeInsets.symmetric(
-                        vertical: 6, horizontal: 16),
-                    child: const Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.admin_panel_settings,
-                            size: 14, color: Colors.white70),
-                        SizedBox(width: 6),
-                        Text(
-                          'Visualizando como Admin',
-                          style: TextStyle(
-                              color: Colors.white70,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w500),
+          : showTabs
+              ? Column(
+                  children: [
+                    // Banner "Visualizando como Admin"
+                    if (showAdminBanner)
+                      Container(
+                        width: double.infinity,
+                        color: Colors.red.shade900,
+                        padding: const EdgeInsets.symmetric(
+                            vertical: 6, horizontal: 16),
+                        child: const Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.admin_panel_settings,
+                                size: 14, color: Colors.white70),
+                            SizedBox(width: 6),
+                            Text(
+                              'Visualizando como Admin',
+                              style: TextStyle(
+                                  color: Colors.white70,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w500),
+                            ),
+                          ],
                         ),
-                      ],
+                      ),
+                    Expanded(
+                      child: TabBarView(
+                        controller: _tabController,
+                        children: [
+                          MuralTab(
+                            leagueId: widget.leagueId,
+                            myUserId: _myUserId ?? '',
+                            isOwner: _isOwner,
+                            canPost: _canPost,
+                          ),
+                          PlacarTab(
+                            leagueId: widget.leagueId,
+                            myUserId: _myUserId ?? '',
+                          ),
+                          CorridasTab(leagueId: widget.leagueId),
+                        ],
+                      ),
                     ),
-                  ),
-                Expanded(
-                  child: TabBarView(
-                    controller: _tabController,
-                    children: [
-                      MuralTab(
-                        leagueId: widget.leagueId,
-                        myUserId: _myUserId ?? '',
-                        isOwner: _isOwner,
-                        canPost: _canPost,
-                      ),
-                      PlacarTab(
-                        leagueId: widget.leagueId,
-                        myUserId: _myUserId ?? '',
-                      ),
-                      CorridasTab(leagueId: widget.leagueId),
-                    ],
-                  ),
-                ),
-              ],
-            ),
+                  ],
+                )
+              : _buildJoinView(),
       bottomNavigationBar: AppBottomNav(selectedIndex: 1),
     );
   }

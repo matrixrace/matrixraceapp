@@ -432,13 +432,53 @@ class _PredictionViewScreenState extends State<PredictionViewScreen> {
     if (mounted) {
       setState(() => _isSaving = false);
       if (res.success) {
+        final data = res.data as Map<String, dynamic>?;
+        final appliedCount = data?['applied'] as int? ?? 0;
+        final errors = (data?['errors'] as List?)?.cast<String>() ?? [];
+        final hasLimitError = errors.any((e) => e.contains('Limite'));
+
         setState(() => _editLeagueIds = leagueIds);
-        // Recarrega dados para refletir novas ligas aplicadas
         await _loadData();
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Ligas atualizadas!'), backgroundColor: Colors.green),
-        );
+
+        if (hasLimitError) {
+          await showDialog(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              title: const Row(
+                children: [
+                  Icon(Icons.info_outline, color: Colors.orange, size: 24),
+                  SizedBox(width: 8),
+                  Expanded(child: Text('Limite de ligas atingido')),
+                ],
+              ),
+              content: Text(
+                appliedCount > 0
+                    ? 'Seu palpite foi aplicado em $appliedCount liga(s), mas você atingiu o limite de ligas simultâneas.\n\n'
+                      'Quando as corridas de uma liga que você participa forem finalizadas, ela será desativada e você poderá entrar em novas ligas.'
+                    : 'Você atingiu o limite de ligas simultâneas e não foi possível aplicar o palpite em nenhuma liga nova.\n\n'
+                      'Quando as corridas de uma liga que você participa forem finalizadas, ela será desativada e você poderá entrar em novas ligas.',
+              ),
+              actions: [
+                ElevatedButton(
+                  onPressed: () => Navigator.of(ctx).pop(),
+                  child: const Text('Entendi'),
+                ),
+              ],
+            ),
+          );
+        } else if (appliedCount > 0) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Palpite aplicado em $appliedCount liga(s)!'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Ligas atualizadas!'), backgroundColor: Colors.green),
+          );
+        }
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(res.message), backgroundColor: Colors.red),
