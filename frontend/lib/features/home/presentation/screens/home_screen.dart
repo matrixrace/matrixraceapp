@@ -20,6 +20,7 @@ class _HomeScreenState extends State<HomeScreen> {
   List<dynamic> _upcomingRaces = [];
   bool _isLoading = true;
   final Set<int> _predictedRaceIds = {};
+  final Set<int> _unappliedRaceIds = {}; // palpites não aplicados a nenhuma liga
   Timer? _countdownTimer;
 
   @override
@@ -80,9 +81,14 @@ class _HomeScreenState extends State<HomeScreen> {
       final list = res.data as List;
       setState(() {
         _predictedRaceIds.clear();
+        _unappliedRaceIds.clear();
         for (final p in list) {
           final id = p['race_id'];
-          if (id != null) _predictedRaceIds.add(id as int);
+          if (id != null) {
+            _predictedRaceIds.add(id as int);
+            final appliedCount = int.tryParse('${p['applied_count'] ?? 0}') ?? 0;
+            if (appliedCount == 0) _unappliedRaceIds.add(id);
+          }
         }
       });
     }
@@ -190,6 +196,28 @@ class _HomeScreenState extends State<HomeScreen> {
               // Três temporizadores: TL1 / Qualificação / Corrida
               _buildCountdownRows(fp1Date, qualiDate, raceDate),
               const SizedBox(height: 12),
+              if (_unappliedRaceIds.contains(race['id'] as int))
+                Container(
+                  margin: const EdgeInsets.only(bottom: 10),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.orange.withValues(alpha: 0.4)),
+                  ),
+                  child: const Row(
+                    children: [
+                      Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 16),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Palpite salvo, mas ainda não aplicado em nenhuma liga',
+                          style: TextStyle(fontSize: 12, color: Colors.orange, fontWeight: FontWeight.w500),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
@@ -282,6 +310,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final dateStr  = _dateRange(fp1Date, raceDate);
     final raceId   = race['id'] as int;
     final hasPrediction = _predictedRaceIds.contains(raceId);
+    final isUnapplied = _unappliedRaceIds.contains(raceId);
 
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
@@ -307,6 +336,22 @@ class _HomeScreenState extends State<HomeScreen> {
                         : '${race['location'] ?? ''}',
                     style: const TextStyle(fontSize: 12, color: Colors.grey),
                   ),
+                  if (isUnapplied)
+                    const Padding(
+                      padding: EdgeInsets.only(top: 3),
+                      child: Row(
+                        children: [
+                          Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 13),
+                          SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              'Falta aplicar em uma liga',
+                              style: TextStyle(fontSize: 11, color: Colors.orange, fontWeight: FontWeight.w500),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   const SizedBox(height: 4),
                   _buildCompactCountdown(race),
                 ],

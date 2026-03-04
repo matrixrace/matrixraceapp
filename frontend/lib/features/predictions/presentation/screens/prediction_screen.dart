@@ -389,20 +389,56 @@ class _PredictionScreenState extends State<PredictionScreen> {
 
     setState(() => _isSaving = false);
 
-    if (mounted) {
-      if (response.success) {
+    if (!mounted) return;
+
+    if (response.success) {
+      final data = response.data as Map<String, dynamic>?;
+      final appliedCount = data?['applied'] as int? ?? 0;
+      final errors = (data?['errors'] as List?)?.cast<String>() ?? [];
+
+      // Verifica se há erros de limite de ligas
+      final hasLimitError = errors.any((e) => e.contains('Limite'));
+
+      if (hasLimitError) {
+        await showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Row(
+              children: [
+                Icon(Icons.info_outline, color: Colors.orange, size: 24),
+                SizedBox(width: 8),
+                Expanded(child: Text('Limite de ligas atingido')),
+              ],
+            ),
+            content: Text(
+              appliedCount > 0
+                  ? 'Seu palpite foi aplicado em $appliedCount liga(s), mas você atingiu o limite de ligas simultâneas.\n\n'
+                    'Quando as corridas de uma liga que você participa forem finalizadas, ela será desativada e você poderá entrar em novas ligas.'
+                  : 'Você atingiu o limite de ligas simultâneas e não foi possível aplicar o palpite em nenhuma liga.\n\n'
+                    'Quando as corridas de uma liga que você participa forem finalizadas, ela será desativada e você poderá entrar em novas ligas.',
+            ),
+            actions: [
+              ElevatedButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: const Text('Entendi'),
+              ),
+            ],
+          ),
+        );
+      } else if (appliedCount > 0) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Palpite aplicado em ${_selectedLeagueIds.length} liga(s)!'),
+            content: Text('Palpite aplicado em $appliedCount liga(s)!'),
             backgroundColor: Colors.green,
           ),
         );
-        context.go('/predictions-view/${widget.raceId}');
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(response.message), backgroundColor: Colors.red),
-        );
       }
+
+      if (mounted) context.go('/predictions-view/${widget.raceId}');
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(response.message), backgroundColor: Colors.red),
+      );
     }
   }
 
@@ -908,28 +944,41 @@ class _PredictionScreenState extends State<PredictionScreen> {
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.all(16),
-        child: Row(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            if (_currentStep > 1)
-              Expanded(
-                flex: 1,
-                child: OutlinedButton(
-                  onPressed: () => setState(() => _currentStep--),
-                  child: const Text('Voltar'),
+            Row(
+              children: [
+                if (_currentStep > 1)
+                  Expanded(
+                    flex: 1,
+                    child: OutlinedButton(
+                      onPressed: () => setState(() => _currentStep--),
+                      child: const Text('Voltar'),
+                    ),
+                  ),
+                if (_currentStep > 1) const SizedBox(width: 12),
+                Expanded(
+                  flex: 2,
+                  child: ElevatedButton.icon(
+                    onPressed: _isSaving ? null : _onNextPressed,
+                    icon: _isSaving
+                        ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                        : Icon(_currentStep == 3 ? Icons.send : Icons.arrow_forward),
+                    label: Text(_isSaving ? 'Aguarde...' : _currentStep == 1 ? 'Próximo' : _currentStep == 2 ? 'Salvar Palpite' : 'Enviar para Ligas'),
+                    style: ElevatedButton.styleFrom(minimumSize: const Size(double.infinity, 52)),
+                  ),
                 ),
-              ),
-            if (_currentStep > 1) const SizedBox(width: 12),
-            Expanded(
-              flex: 2,
-              child: ElevatedButton.icon(
-                onPressed: _isSaving ? null : _onNextPressed,
-                icon: _isSaving
-                    ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                    : Icon(_currentStep == 3 ? Icons.send : Icons.arrow_forward),
-                label: Text(_isSaving ? 'Aguarde...' : _currentStep == 1 ? 'Próximo' : _currentStep == 2 ? 'Salvar Palpite' : 'Enviar para Ligas'),
-                style: ElevatedButton.styleFrom(minimumSize: const Size(double.infinity, 52)),
-              ),
+              ],
             ),
+            if (_currentStep == 3) ...[
+              const SizedBox(height: 8),
+              TextButton(
+                onPressed: () => context.go('/predictions-view/${widget.raceId}'),
+                child: const Text('Pular — aplicar depois',
+                    style: TextStyle(color: Colors.grey, fontSize: 13)),
+              ),
+            ],
           ],
         ),
       ),

@@ -321,7 +321,9 @@ async function getMyPredictions(req, res, next) {
     const result = await pool.query(
       `SELECT DISTINCT ON (p.race_id)
               p.race_id, p.lock_type, p.max_points_per_driver, p.updated_at,
-              r.name as race_name, r.race_date, r.fp1_date, r.qualifying_date, r.round
+              r.name as race_name, r.race_date, r.fp1_date, r.qualifying_date, r.round,
+              (SELECT COUNT(*) FROM prediction_applications pa
+               WHERE pa.race_id = p.race_id AND pa.user_id = p.user_id) as applied_count
        FROM predictions p
        JOIN races r ON r.id = p.race_id
        WHERE p.user_id = $1
