@@ -67,6 +67,12 @@ class _MainShellState extends State<MainShell> {
           ),
         ),
         actions: [
+          // Botão "Como Funciona"
+          IconButton(
+            icon: const Icon(Icons.help_outline),
+            tooltip: 'Como Funciona',
+            onPressed: () => context.push('/how-it-works'),
+          ),
           // Sino de notificações com badge
           Stack(
             clipBehavior: Clip.none,
