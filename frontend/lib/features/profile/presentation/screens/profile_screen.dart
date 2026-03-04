@@ -140,7 +140,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           child: _ActionCard(
             icon: Icons.chat_bubble_outline,
             label: 'Mensagens',
-            onTap: () => context.push('/messages'),
+            onTap: () => context.push('/messaging'),
           ),
         ),
         const SizedBox(width: 12),

@@ -25,6 +25,9 @@ const { leaguePollOptions } = require('./leaguePollOptions');
 const { leaguePollVotes } = require('./leaguePollVotes');
 const { raceAiOrders } = require('./race_ai_orders');
 const { systemSettings } = require('./system_settings');
+const { chatGroups } = require('./chatGroups');
+const { chatGroupMembers } = require('./chatGroupMembers');
+const { messageReadReceipts } = require('./messageReadReceipts');
 
 module.exports = {
   users,
@@ -51,4 +54,7 @@ module.exports = {
   leaguePollVotes,
   raceAiOrders,
   systemSettings,
+  chatGroups,
+  chatGroupMembers,
+  messageReadReceipts,
 };

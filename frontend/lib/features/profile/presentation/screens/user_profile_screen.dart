@@ -281,14 +281,30 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
 
     switch (status) {
       case 'friends':
-        return OutlinedButton.icon(
-          icon: const Icon(Icons.check, size: 16),
-          label: const Text('Amigos'),
-          onPressed: null,
-          style: OutlinedButton.styleFrom(
-            foregroundColor: AppTheme.successGreen,
-            side: const BorderSide(color: AppTheme.successGreen),
-          ),
+        return Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            OutlinedButton.icon(
+              icon: const Icon(Icons.check, size: 16),
+              label: const Text('Amigos'),
+              onPressed: null,
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppTheme.successGreen,
+                side: const BorderSide(color: AppTheme.successGreen),
+              ),
+            ),
+            const SizedBox(width: 12),
+            IconButton(
+              icon: const Icon(Icons.chat_bubble_outline, color: AppTheme.primaryGreen),
+              tooltip: 'Enviar mensagem',
+              onPressed: () => context.push('/messaging?friendId=${widget.userId}'),
+              style: IconButton.styleFrom(
+                backgroundColor: AppTheme.surfaceColor,
+                padding: const EdgeInsets.all(12),
+              ),
+            ),
+          ],
         );
 
       case 'pending_sent':

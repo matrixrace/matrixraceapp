@@ -1,66 +1,145 @@
 const { db } = require('../config/database');
-const { messages, users, friendships, leagueMembers, leagues, leagueChatAllowed } = require('../db/schema');
-const { eq, and, or, asc, desc } = require('drizzle-orm');
+const { pool } = require('../config/database');
+const {
+  messages,
+  users,
+  friendships,
+  leagueMembers,
+  leagues,
+  leagueChatAllowed,
+  chatGroups,
+  chatGroupMembers,
+  messageReadReceipts,
+} = require('../db/schema');
+const { eq, and, or, asc, desc, isNotNull, isNull, sql } = require('drizzle-orm');
 const { successResponse, errorResponse } = require('../utils/helpers');
 
 // GET /api/v1/messages/conversations
-// Lista todas as conversas privadas do usuário (última mensagem de cada)
+// Lista unificada de conversas: privadas + grupos + ligas
 async function getConversations(req, res, next) {
   try {
     const userId = req.user.id;
+    const conversations = [];
 
-    // Busca todas as mensagens onde o usuário é remetente ou destinatário
-    const allMessages = await db
-      .select({
-        id: messages.id,
-        senderId: messages.senderId,
-        receiverId: messages.receiverId,
-        content: messages.content,
-        isRead: messages.isRead,
-        createdAt: messages.createdAt,
-      })
-      .from(messages)
-      .where(
-        and(
-          or(eq(messages.senderId, userId), eq(messages.receiverId, userId)),
-          // Mensagens privadas apenas (sem leagueId)
-        )
+    // === CONVERSAS PRIVADAS (otimizado com SQL direto) ===
+    const privateResult = await pool.query(`
+      WITH ranked AS (
+        SELECT
+          m.id, m.sender_id, m.receiver_id, m.content, m.is_read, m.created_at,
+          CASE WHEN m.sender_id = $1 THEN m.receiver_id ELSE m.sender_id END AS other_id,
+          ROW_NUMBER() OVER (
+            PARTITION BY CASE WHEN m.sender_id = $1 THEN m.receiver_id ELSE m.sender_id END
+            ORDER BY m.created_at DESC
+          ) AS rn
+        FROM messages m
+        WHERE (m.sender_id = $1 OR m.receiver_id = $1)
+          AND m.receiver_id IS NOT NULL
+          AND m.league_id IS NULL
+          AND m.group_id IS NULL
       )
-      .orderBy(desc(messages.createdAt));
+      SELECT r.*, u.display_name, u.avatar_url,
+        (SELECT COUNT(*) FROM messages m2
+         WHERE m2.sender_id = r.other_id AND m2.receiver_id = $1
+           AND m2.is_read = false AND m2.league_id IS NULL AND m2.group_id IS NULL
+        ) AS unread_count
+      FROM ranked r
+      JOIN users u ON u.id = r.other_id
+      WHERE r.rn = 1
+      ORDER BY r.created_at DESC
+    `, [userId]);
 
-    // Agrupa por conversa (par de usuários)
-    const conversationMap = new Map();
-    for (const msg of allMessages) {
-      if (!msg.receiverId) continue; // Pula mensagens de liga
-      const otherId = msg.senderId === userId ? msg.receiverId : msg.senderId;
-      if (!conversationMap.has(otherId)) {
-        conversationMap.set(otherId, msg);
-      }
+    for (const row of privateResult.rows) {
+      conversations.push({
+        type: 'private',
+        friend: {
+          id: row.other_id,
+          displayName: row.display_name,
+          avatarUrl: row.avatar_url,
+        },
+        lastMessage: {
+          content: row.content,
+          createdAt: row.created_at,
+          isFromMe: row.sender_id === userId,
+        },
+        unreadCount: parseInt(row.unread_count),
+      });
     }
 
-    // Busca dados dos outros usuários
-    const conversations = await Promise.all(
-      Array.from(conversationMap.entries()).map(async ([otherId, lastMsg]) => {
-        const [otherUser] = await db
-          .select({ id: users.id, displayName: users.displayName, avatarUrl: users.avatarUrl })
-          .from(users)
-          .where(eq(users.id, otherId))
-          .limit(1);
+    // === CONVERSAS DE GRUPO ===
+    const myGroupMemberships = await db
+      .select({ groupId: chatGroupMembers.groupId })
+      .from(chatGroupMembers)
+      .where(eq(chatGroupMembers.userId, userId));
 
-        // Conta mensagens não lidas desta conversa
-        const unreadMessages = allMessages.filter(
-          m => m.senderId === otherId && m.receiverId === userId && !m.isRead
+    for (const { groupId } of myGroupMemberships) {
+      const [group] = await db
+        .select()
+        .from(chatGroups)
+        .where(eq(chatGroups.id, groupId))
+        .limit(1);
+
+      if (!group) continue;
+
+      const [lastMsg] = await db
+        .select({
+          content: messages.content,
+          createdAt: messages.createdAt,
+          senderName: users.displayName,
+          senderId: messages.senderId,
+        })
+        .from(messages)
+        .innerJoin(users, eq(messages.senderId, users.id))
+        .where(eq(messages.groupId, groupId))
+        .orderBy(desc(messages.createdAt))
+        .limit(1);
+
+      const [unreadResult] = await db
+        .select({ count: sql`COUNT(*)` })
+        .from(messages)
+        .where(
+          and(
+            eq(messages.groupId, groupId),
+            sql`${messages.senderId} != ${userId}`,
+            sql`${messages.id} NOT IN (
+              SELECT message_id FROM message_read_receipts
+              WHERE user_id = ${userId}
+            )`
+          )
         );
 
-        return {
-          friend: otherUser,
-          lastMessage: { content: lastMsg.content, createdAt: lastMsg.createdAt, isFromMe: lastMsg.senderId === userId },
-          unreadCount: unreadMessages.length,
-        };
-      })
-    );
+      const [memberCount] = await db
+        .select({ count: sql`COUNT(*)` })
+        .from(chatGroupMembers)
+        .where(eq(chatGroupMembers.groupId, groupId));
 
-    res.json(successResponse(conversations.filter(c => c.friend)));
+      conversations.push({
+        type: 'group',
+        group: {
+          id: group.id,
+          name: group.name,
+          avatarUrl: group.avatarUrl,
+          memberCount: parseInt(memberCount.count),
+        },
+        lastMessage: lastMsg
+          ? {
+              content: lastMsg.content,
+              createdAt: lastMsg.createdAt,
+              isFromMe: lastMsg.senderId === userId,
+              senderName: lastMsg.senderName,
+            }
+          : null,
+        unreadCount: parseInt(unreadResult.count),
+      });
+    }
+
+    // Ordena tudo por última mensagem (mais recente primeiro)
+    conversations.sort((a, b) => {
+      const dateA = a.lastMessage?.createdAt || new Date(0);
+      const dateB = b.lastMessage?.createdAt || new Date(0);
+      return new Date(dateB) - new Date(dateA);
+    });
+
+    res.json(successResponse(conversations));
   } catch (error) {
     next(error);
   }
@@ -114,10 +193,10 @@ async function getPrivateMessages(req, res, next) {
       .limit(limit)
       .offset(offset);
 
-    // Marca mensagens recebidas como lidas
+    // Marca mensagens recebidas como lidas (com readAt)
     await db
       .update(messages)
-      .set({ isRead: true })
+      .set({ isRead: true, readAt: new Date() })
       .where(
         and(
           eq(messages.senderId, friendId),
@@ -280,6 +359,38 @@ async function removeChatAllowed(req, res, next) {
   }
 }
 
+// PUT /api/v1/messages/read
+// Marca mensagens específicas como lidas (backup REST para o socket)
+async function markAsRead(req, res, next) {
+  try {
+    const userId = req.user.id;
+    const { messageIds } = req.body;
+
+    if (!messageIds || !Array.isArray(messageIds) || messageIds.length === 0) {
+      return next(errorResponse('Informe os IDs das mensagens', 400));
+    }
+
+    // Marca mensagens privadas como lidas
+    await pool.query(`
+      UPDATE messages
+      SET is_read = true, read_at = NOW()
+      WHERE id = ANY($1) AND receiver_id = $2 AND is_read = false
+    `, [messageIds, userId]);
+
+    // Insere read receipts para mensagens de grupo
+    for (const msgId of messageIds) {
+      await db
+        .insert(messageReadReceipts)
+        .values({ messageId: msgId, userId })
+        .onConflictDoNothing();
+    }
+
+    res.json(successResponse(null, 'Mensagens marcadas como lidas'));
+  } catch (error) {
+    next(error);
+  }
+}
+
 module.exports = {
   getConversations,
   getPrivateMessages,
@@ -287,4 +398,5 @@ module.exports = {
   updateLeagueChatSettings,
   addChatAllowed,
   removeChatAllowed,
+  markAsRead,
 };

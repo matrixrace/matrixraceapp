@@ -423,6 +423,55 @@ async function migrate() {
     `);
     console.log('✓ Configurações padrão de ligas inseridas');
 
+    // =============================================
+    // GRUPOS DE CHAT (entre amigos, separado de ligas)
+    // =============================================
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS chat_groups (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        name VARCHAR(100) NOT NULL,
+        avatar_url TEXT,
+        creator_id UUID REFERENCES users(id) ON DELETE CASCADE NOT NULL,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      );
+    `);
+    console.log('✓ Tabela chat_groups criada');
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS chat_group_members (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        group_id UUID REFERENCES chat_groups(id) ON DELETE CASCADE NOT NULL,
+        user_id UUID REFERENCES users(id) ON DELETE CASCADE NOT NULL,
+        role VARCHAR(20) DEFAULT 'member',
+        joined_at TIMESTAMP DEFAULT NOW(),
+        UNIQUE(group_id, user_id)
+      );
+    `);
+    console.log('✓ Tabela chat_group_members criada');
+
+    // Adiciona group_id e read_at na tabela messages
+    await client.query(`
+      ALTER TABLE messages ADD COLUMN IF NOT EXISTS group_id UUID REFERENCES chat_groups(id) ON DELETE CASCADE;
+    `);
+    await client.query(`
+      ALTER TABLE messages ADD COLUMN IF NOT EXISTS read_at TIMESTAMP;
+    `);
+    console.log('✓ Colunas group_id e read_at adicionadas em messages');
+
+    // Tabela de confirmações de leitura (para grupos)
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS message_read_receipts (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        message_id UUID REFERENCES messages(id) ON DELETE CASCADE NOT NULL,
+        user_id UUID REFERENCES users(id) ON DELETE CASCADE NOT NULL,
+        read_at TIMESTAMP DEFAULT NOW(),
+        UNIQUE(message_id, user_id)
+      );
+    `);
+    console.log('✓ Tabela message_read_receipts criada');
+
     // Criar índices para melhor performance
     console.log('\nCriando índices...');
 
@@ -450,6 +499,11 @@ async function migrate() {
       'CREATE INDEX IF NOT EXISTS idx_league_post_likes_post ON league_post_likes(post_id);',
       'CREATE INDEX IF NOT EXISTS idx_league_post_comments_post ON league_post_comments(post_id);',
       'CREATE INDEX IF NOT EXISTS idx_league_poll_votes_poll ON league_poll_votes(poll_id);',
+      'CREATE INDEX IF NOT EXISTS idx_messages_group ON messages(group_id);',
+      'CREATE INDEX IF NOT EXISTS idx_chat_group_members_group ON chat_group_members(group_id);',
+      'CREATE INDEX IF NOT EXISTS idx_chat_group_members_user ON chat_group_members(user_id);',
+      'CREATE INDEX IF NOT EXISTS idx_message_read_receipts_message ON message_read_receipts(message_id);',
+      'CREATE INDEX IF NOT EXISTS idx_message_read_receipts_user ON message_read_receipts(user_id);',
     ];
 
     for (const idx of indexes) {

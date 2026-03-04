@@ -13,9 +13,8 @@ import '../features/predictions/presentation/screens/prediction_view_screen.dart
 import '../features/leagues/presentation/screens/create_league_screen.dart';
 import '../features/profile/presentation/screens/edit_profile_screen.dart';
 import '../features/friends/presentation/screens/friends_screen.dart';
-import '../features/chat/presentation/screens/conversations_screen.dart';
-import '../features/chat/presentation/screens/chat_screen.dart';
 import '../features/chat/presentation/screens/league_chat_screen.dart';
+import '../features/chat/presentation/screens/messaging_screen.dart';
 import '../features/notifications/presentation/screens/notifications_screen.dart';
 import '../features/leagues/presentation/screens/league_detail_screen.dart';
 import '../features/f1results/presentation/screens/f1_results_screen.dart';
@@ -112,14 +111,20 @@ class AppRouter {
         builder: (context, state) => const FriendsScreen(),
       ),
       GoRoute(
+        path: '/messaging',
+        builder: (context, state) => MessagingScreen(
+          initialFriendId: state.uri.queryParameters['friendId'],
+          initialGroupId: state.uri.queryParameters['groupId'],
+        ),
+      ),
+      GoRoute(
         path: '/messages',
-        builder: (context, state) => const ConversationsScreen(),
+        redirect: (context, state) => '/messaging',
       ),
       GoRoute(
         path: '/chat/:friendId',
-        builder: (context, state) => ChatScreen(
-          friendId: state.pathParameters['friendId']!,
-        ),
+        redirect: (context, state) =>
+            '/messaging?friendId=${state.pathParameters['friendId']}',
       ),
       GoRoute(
         path: '/notifications',
