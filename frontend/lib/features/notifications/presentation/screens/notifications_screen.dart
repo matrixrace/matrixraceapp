@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/app_theme.dart';
 
@@ -45,8 +46,51 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   Future<void> _markRead(String id, int index) async {
     if (_notifications[index]['isRead'] == true) return;
     await _api.put('/notifications/$id/read');
-    setState(() => (_notifications[index] as Map<String, dynamic>)['isRead'] = true);
+    if (mounted) {
+      setState(() => (_notifications[index] as Map<String, dynamic>)['isRead'] = true);
+    }
   }
+
+  /// Navega para a tela correta ao tocar em uma notificação
+  Future<void> _onTapNotification(Map<String, dynamic> notif, int index) async {
+    final id = notif['id'] as String;
+    final type = notif['type'] as String? ?? '';
+    final data = (notif['data'] as Map?)?.cast<String, dynamic>() ?? {};
+
+    await _markRead(id, index);
+    if (!mounted) return;
+
+    switch (type) {
+      case 'new_message':
+        final senderId = data['senderId'] as String?;
+        if (senderId != null) {
+          context.push('/messaging?friendId=$senderId');
+        } else {
+          context.push('/messaging');
+        }
+        break;
+      case 'league_message':
+        final leagueId = data['leagueId'] as String?;
+        if (leagueId != null) {
+          context.push('/leagues/$leagueId/chat');
+        }
+        break;
+      case 'friend_request':
+      case 'friend_accepted':
+        final senderId = data['senderId'] as String?;
+        if (senderId != null) {
+          context.push('/users/$senderId');
+        }
+        break;
+    }
+  }
+
+  bool _isNavigable(String type) => const [
+    'new_message',
+    'league_message',
+    'friend_request',
+    'friend_accepted',
+  ].contains(type);
 
   @override
   Widget build(BuildContext context) {
@@ -80,17 +124,17 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                     )
                   : ListView.separated(
                       itemCount: _notifications.length,
-                      separatorBuilder: (_, _) => const Divider(height: 1),
+                      separatorBuilder: (_, __) => const Divider(height: 1),
                       itemBuilder: (context, i) {
                         final notif = _notifications[i] as Map<String, dynamic>;
                         final isRead = notif['isRead'] == true;
                         final type = notif['type'] as String? ?? '';
                         final title = notif['title'] as String? ?? '';
                         final body = notif['body'] as String? ?? '';
-                        final id = notif['id'] as String;
+                        final isNavigable = _isNavigable(type);
 
                         return InkWell(
-                          onTap: () => _markRead(id, i),
+                          onTap: () => _onTapNotification(notif, i),
                           child: Container(
                             color: isRead ? null : AppTheme.primaryRed.withValues(alpha: 0.06),
                             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -99,7 +143,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                               children: [
                                 Container(
                                   padding: const EdgeInsets.all(8),
-                                  decoration: BoxDecoration(
+                                  decoration: const BoxDecoration(
                                     color: AppTheme.surfaceColor,
                                     shape: BoxShape.circle,
                                   ),
@@ -132,6 +176,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                                                   color: AppTheme.primaryRed,
                                                   shape: BoxShape.circle),
                                             ),
+                                          if (isNavigable)
+                                            const Icon(Icons.chevron_right,
+                                                color: AppTheme.textSecondary, size: 16),
                                         ],
                                       ),
                                       if (body.isNotEmpty) ...[
