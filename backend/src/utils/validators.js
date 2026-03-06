@@ -114,6 +114,8 @@ const manualSessionResultsSchema = z.object({
     z.object({
       driverId: z.number().int().positive('ID do piloto invalido'),
       position: z.number().int().min(1, 'Posicao deve ser >= 1'),
+      bestLapTime: z.string().nullable().optional(),
+      gap: z.string().nullable().optional(),
     })
   ).min(1, 'Pelo menos 1 resultado e necessario'),
 });

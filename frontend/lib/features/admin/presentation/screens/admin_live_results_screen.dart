@@ -11,25 +11,26 @@ class AdminLiveResultsScreen extends StatefulWidget {
   State<AdminLiveResultsScreen> createState() => _AdminLiveResultsScreenState();
 }
 
-class _AdminLiveResultsScreenState extends State<AdminLiveResultsScreen> with SingleTickerProviderStateMixin {
+class _AdminLiveResultsScreenState extends State<AdminLiveResultsScreen>
+    with SingleTickerProviderStateMixin {
   final ApiClient _api = ApiClient();
   final SocketService _socket = SocketService();
 
-  // Corridas
   List<Map<String, dynamic>> _races = [];
   int? _selectedRaceId;
   bool _loadingRaces = true;
 
-  // Sessoes
   Map<String, dynamic>? _raceInfo;
   List<String> _availableSessions = [];
   Map<String, dynamic> _sessions = {};
   TabController? _tabController;
   bool _loadingSessions = false;
-  bool _refreshing = false;
+  bool _saving = false;
 
-  // Pilotos para fallback manual
   List<Map<String, dynamic>> _drivers = [];
+
+  // Editing state per session
+  final Map<String, List<_DriverEntry>> _editingEntries = {};
 
   StreamSubscription? _socketSub;
 
@@ -52,7 +53,9 @@ class _AdminLiveResultsScreenState extends State<AdminLiveResultsScreen> with Si
     if (!mounted) return;
     if (res.success && res.data != null) {
       setState(() {
-        _races = (res.data as List).map((r) => Map<String, dynamic>.from(r)).toList();
+        _races = (res.data as List)
+            .map((r) => Map<String, dynamic>.from(r))
+            .toList();
         _loadingRaces = false;
       });
     }
@@ -62,14 +65,19 @@ class _AdminLiveResultsScreenState extends State<AdminLiveResultsScreen> with Si
     final res = await _api.get('/admin/drivers');
     if (!mounted) return;
     if (res.success && res.data != null) {
-      _drivers = (res.data as List).map((d) => Map<String, dynamic>.from(d)).toList();
+      _drivers = (res.data as List)
+          .map((d) => Map<String, dynamic>.from(d))
+          .toList();
     }
   }
 
   Future<void> _selectRace(int raceId) async {
-    setState(() { _selectedRaceId = raceId; _loadingSessions = true; });
+    setState(() {
+      _selectedRaceId = raceId;
+      _loadingSessions = true;
+      _editingEntries.clear();
+    });
 
-    // Socket
     _socketSub?.cancel();
     _socket.joinRace(raceId);
     _socketSub = _socket.sessionResultsStream.listen((data) {
@@ -87,7 +95,8 @@ class _AdminLiveResultsScreenState extends State<AdminLiveResultsScreen> with Si
 
     if (res.success && res.data != null) {
       final data = res.data as Map<String, dynamic>;
-      final available = (data['availableSessions'] as List?)?.cast<String>() ?? [];
+      final available =
+          (data['availableSessions'] as List?)?.cast<String>() ?? [];
 
       setState(() {
         _raceInfo = data['race'] as Map<String, dynamic>?;
@@ -95,33 +104,94 @@ class _AdminLiveResultsScreenState extends State<AdminLiveResultsScreen> with Si
         _sessions = data['sessions'] as Map<String, dynamic>? ?? {};
         _loadingSessions = false;
 
-        if (_tabController == null || _tabController!.length != available.length) {
+        if (_tabController == null ||
+            _tabController!.length != available.length) {
           _tabController?.dispose();
-          _tabController = TabController(length: available.length, vsync: this);
+          _tabController =
+              TabController(length: available.length, vsync: this);
+        }
+
+        // Build editing entries from existing data or drivers list
+        for (final st in available) {
+          if (!_editingEntries.containsKey(st)) {
+            _editingEntries[st] = _buildEntries(st);
+          }
         }
       });
     }
   }
 
-  Future<void> _refreshSession(String sessionType) async {
-    if (_selectedRaceId == null) return;
-    setState(() => _refreshing = true);
+  List<_DriverEntry> _buildEntries(String sessionType) {
+    final session = _sessions[sessionType];
+    final results =
+        (session?['results'] as List?)?.cast<Map<String, dynamic>>() ?? [];
 
-    final res = await _api.post('/live/admin/races/$_selectedRaceId/sessions/$sessionType/refresh');
+    if (results.isNotEmpty) {
+      return results.map((r) {
+        final driverId = r['driverId'];
+        final driver = _drivers.firstWhere(
+          (d) => d['id'] == driverId,
+          orElse: () => <String, dynamic>{},
+        );
+        return _DriverEntry(
+          driverId: driverId,
+          name: r['abbreviation'] ??
+              driver['abbreviation'] ??
+              '${r['firstName'] ?? ''} ${r['lastName'] ?? ''}',
+          fullName:
+              '${driver['first_name'] ?? r['firstName'] ?? ''} ${driver['last_name'] ?? r['lastName'] ?? ''}',
+          bestLapTime: r['bestLapTime'] ?? r['best_lap_time'] ?? '',
+          gap: r['gap'] ?? '',
+        );
+      }).toList();
+    }
+
+    // No existing results — populate from active drivers
+    final active =
+        _drivers.where((d) => d['is_active'] == true).toList();
+    return active.map((d) {
+      return _DriverEntry(
+        driverId: d['id'],
+        name: d['abbreviation'] ?? '???',
+        fullName: '${d['first_name']} ${d['last_name']}',
+        bestLapTime: '',
+        gap: '',
+      );
+    }).toList();
+  }
+
+  Future<void> _saveSession(String sessionType) async {
+    if (_selectedRaceId == null) return;
+    final entries = _editingEntries[sessionType];
+    if (entries == null || entries.isEmpty) return;
+
+    setState(() => _saving = true);
+
+    final body = {
+      'results': entries.asMap().entries.map((e) {
+        final entry = e.value;
+        return {
+          'driverId': entry.driverId,
+          'position': e.key + 1,
+          'bestLapTime': entry.bestLapTime.isNotEmpty ? entry.bestLapTime : null,
+          'gap': entry.gap.isNotEmpty ? entry.gap : null,
+        };
+      }).toList(),
+    };
+
+    final res = await _api.post(
+      '/live/admin/races/$_selectedRaceId/sessions/$sessionType/manual',
+      body: body,
+    );
     if (!mounted) return;
 
-    setState(() => _refreshing = false);
+    setState(() => _saving = false);
 
     if (res.success) {
-      _showSnack('Sessao ${_sessionLabel(sessionType)} atualizada!', Colors.green);
+      _showSnack('Sessao ${_sessionLabel(sessionType)} salva!', Colors.green);
       await _loadSessionData();
     } else {
-      final isManualFallback = res.data is Map && res.data['manualFallback'] == true;
-      if (isManualFallback) {
-        _showSnack('API indisponivel. Use o modo manual.', Colors.orange);
-      } else {
-        _showSnack(res.message ?? 'Erro ao atualizar', Colors.red);
-      }
+      _showSnack(res.message ?? 'Erro ao salvar', Colors.red);
     }
   }
 
@@ -131,12 +201,16 @@ class _AdminLiveResultsScreenState extends State<AdminLiveResultsScreen> with Si
       builder: (ctx) => AlertDialog(
         backgroundColor: AppTheme.cardBackground,
         title: const Text('Enviar para Pontuacao'),
-        content: const Text('Isso vai copiar os resultados da corrida como oficiais e calcular a pontuacao de todos os usuarios. Continuar?'),
+        content: const Text(
+            'Isso vai copiar os resultados da corrida como oficiais e calcular a pontuacao de todos os usuarios. Continuar?'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancelar')),
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx, true),
-            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primaryRed),
+            style:
+                ElevatedButton.styleFrom(backgroundColor: AppTheme.primaryRed),
             child: const Text('Confirmar'),
           ),
         ],
@@ -145,7 +219,8 @@ class _AdminLiveResultsScreenState extends State<AdminLiveResultsScreen> with Si
 
     if (confirmed != true || _selectedRaceId == null) return;
 
-    final res = await _api.post('/live/admin/races/$_selectedRaceId/finalize-results');
+    final res = await _api
+        .post('/live/admin/races/$_selectedRaceId/finalize-results');
     if (!mounted) return;
 
     if (res.success) {
@@ -156,70 +231,43 @@ class _AdminLiveResultsScreenState extends State<AdminLiveResultsScreen> with Si
     }
   }
 
-  Future<void> _openManualMode(String sessionType) async {
-    // Ordena pilotos por posicao (ou ordem padrao)
-    final currentResults = (_sessions[sessionType]?['results'] as List?)?.cast<Map<String, dynamic>>() ?? [];
-    List<Map<String, dynamic>> orderedDrivers;
-
-    if (currentResults.isNotEmpty) {
-      orderedDrivers = currentResults.map((r) {
-        final driver = _drivers.firstWhere((d) => d['id'] == r['driverId'], orElse: () => r);
-        return {
-          'driverId': r['driverId'],
-          'name': '${driver['first_name'] ?? r['firstName'] ?? ''} ${driver['last_name'] ?? r['lastName'] ?? ''}',
-          'abbreviation': driver['abbreviation'] ?? r['abbreviation'] ?? '???',
-        };
-      }).toList();
-    } else {
-      orderedDrivers = _drivers.where((d) => d['is_active'] == true).map((d) => {
-        'driverId': d['id'],
-        'name': '${d['first_name']} ${d['last_name']}',
-        'abbreviation': d['abbreviation'] ?? '???',
-      }).toList();
-    }
-
-    final result = await showDialog<List<Map<String, dynamic>>>(
-      context: context,
-      builder: (ctx) => _ManualOrderDialog(drivers: orderedDrivers, sessionType: sessionType),
-    );
-
-    if (result == null || _selectedRaceId == null) return;
-
-    final body = {
-      'results': result.asMap().entries.map((e) => {
-        'driverId': e.value['driverId'],
-        'position': e.key + 1,
-      }).toList(),
-    };
-
-    final res = await _api.post('/live/admin/races/$_selectedRaceId/sessions/$sessionType/manual', body: body);
-    if (!mounted) return;
-
-    if (res.success) {
-      _showSnack('Resultados manuais salvos!', Colors.green);
-      _loadSessionData();
-    } else {
-      _showSnack(res.message ?? 'Erro', Colors.red);
-    }
-  }
-
   void _showSnack(String msg, Color color) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(msg), backgroundColor: color, duration: const Duration(seconds: 3)),
+      SnackBar(
+          content: Text(msg),
+          backgroundColor: color,
+          duration: const Duration(seconds: 3)),
     );
   }
 
   String _sessionLabel(String type) {
     switch (type) {
-      case 'FP1': return 'TL1';
-      case 'FP2': return 'TL2';
-      case 'FP3': return 'TL3';
-      case 'qualifying': return 'Classificacao';
-      case 'sprint_qualifying': return 'Classif. Sprint';
-      case 'sprint': return 'Sprint';
-      case 'race': return 'Corrida';
-      default: return type;
+      case 'FP1':
+        return 'TL1';
+      case 'FP2':
+        return 'TL2';
+      case 'FP3':
+        return 'TL3';
+      case 'qualifying':
+        return 'Classificacao';
+      case 'sprint_qualifying':
+        return 'Classif. Sprint';
+      case 'sprint':
+        return 'Sprint';
+      case 'race':
+        return 'Corrida';
+      default:
+        return type;
+    }
+  }
+
+  String _formatTime(String iso) {
+    try {
+      final dt = DateTime.parse(iso).toLocal();
+      return '${dt.day}/${dt.month} ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+    } catch (_) {
+      return iso;
     }
   }
 
@@ -227,7 +275,7 @@ class _AdminLiveResultsScreenState extends State<AdminLiveResultsScreen> with Si
   Widget build(BuildContext context) {
     return Row(
       children: [
-        // Lista de corridas (lateral)
+        // Race list sidebar
         SizedBox(
           width: 260,
           child: Column(
@@ -237,41 +285,61 @@ class _AdminLiveResultsScreenState extends State<AdminLiveResultsScreen> with Si
                 width: double.infinity,
                 padding: const EdgeInsets.all(16),
                 color: AppTheme.primaryRed.withValues(alpha: 0.1),
-                child: const Text('Selecione a Corrida', style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.primaryRed)),
+                child: const Text('Selecione a Corrida',
+                    style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: AppTheme.primaryRed)),
               ),
               Expanded(
                 child: _loadingRaces
-                  ? const Center(child: CircularProgressIndicator())
-                  : ListView.builder(
-                      itemCount: _races.length,
-                      itemBuilder: (ctx, i) {
-                        final race = _races[i];
-                        final isSelected = race['id'] == _selectedRaceId;
-                        return ListTile(
-                          dense: true,
-                          selected: isSelected,
-                          selectedTileColor: AppTheme.primaryRed.withValues(alpha: 0.1),
-                          title: Text(race['name'] ?? 'Corrida ${race['round']}', style: TextStyle(fontSize: 13, fontWeight: isSelected ? FontWeight.bold : FontWeight.normal)),
-                          subtitle: Text('R${race['round']} - ${race['season']}', style: const TextStyle(fontSize: 11)),
-                          trailing: race['isCompleted'] == true
-                            ? const Icon(Icons.check_circle, color: Colors.green, size: 16)
-                            : (race['isSprintWeekend'] == true ? const Icon(Icons.bolt, color: Colors.orange, size: 16) : null),
-                          onTap: () => _selectRace(race['id'] as int),
-                        );
-                      },
-                    ),
+                    ? const Center(child: CircularProgressIndicator())
+                    : ListView.builder(
+                        itemCount: _races.length,
+                        itemBuilder: (ctx, i) {
+                          final race = _races[i];
+                          final isSelected = race['id'] == _selectedRaceId;
+                          return ListTile(
+                            dense: true,
+                            selected: isSelected,
+                            selectedTileColor:
+                                AppTheme.primaryRed.withValues(alpha: 0.1),
+                            title: Text(
+                                race['name'] ?? 'Corrida ${race['round']}',
+                                style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: isSelected
+                                        ? FontWeight.bold
+                                        : FontWeight.normal)),
+                            subtitle: Text(
+                                'R${race['round']} - ${race['season']}',
+                                style: const TextStyle(fontSize: 11)),
+                            trailing: race['isCompleted'] == true ||
+                                    race['is_completed'] == true
+                                ? const Icon(Icons.check_circle,
+                                    color: Colors.green, size: 16)
+                                : (race['isSprintWeekend'] == true ||
+                                        race['is_sprint_weekend'] == true
+                                    ? const Icon(Icons.bolt,
+                                        color: Colors.orange, size: 16)
+                                    : null),
+                            onTap: () => _selectRace(race['id'] as int),
+                          );
+                        },
+                      ),
               ),
             ],
           ),
         ),
         const VerticalDivider(width: 1),
-        // Conteudo da sessao
+        // Content
         Expanded(
           child: _selectedRaceId == null
-            ? const Center(child: Text('Selecione uma corrida', style: TextStyle(color: AppTheme.textSecondary)))
-            : _loadingSessions
-              ? const Center(child: CircularProgressIndicator())
-              : _buildSessionContent(),
+              ? const Center(
+                  child: Text('Selecione uma corrida',
+                      style: TextStyle(color: AppTheme.textSecondary)))
+              : _loadingSessions
+                  ? const Center(child: CircularProgressIndicator())
+                  : _buildSessionContent(),
         ),
       ],
     );
@@ -284,27 +352,43 @@ class _AdminLiveResultsScreenState extends State<AdminLiveResultsScreen> with Si
 
     return Column(
       children: [
-        // Race info header
+        // Header
         Container(
           width: double.infinity,
           padding: const EdgeInsets.all(12),
           color: AppTheme.cardBackground,
           child: Row(
             children: [
-              Text(_raceInfo?['name'] ?? '', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              Text(_raceInfo?['name'] ?? '',
+                  style: const TextStyle(
+                      fontSize: 16, fontWeight: FontWeight.bold)),
               const SizedBox(width: 8),
               if (_raceInfo?['isSprintWeekend'] == true)
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                  decoration: BoxDecoration(color: Colors.orange.withValues(alpha: 0.2), borderRadius: BorderRadius.circular(4)),
-                  child: const Text('SPRINT', style: TextStyle(fontSize: 10, color: Colors.orange, fontWeight: FontWeight.bold)),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                      color: Colors.orange.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(4)),
+                  child: const Text('SPRINT',
+                      style: TextStyle(
+                          fontSize: 10,
+                          color: Colors.orange,
+                          fontWeight: FontWeight.bold)),
                 ),
               if (_raceInfo?['isCompleted'] == true) ...[
                 const SizedBox(width: 8),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                  decoration: BoxDecoration(color: Colors.green.withValues(alpha: 0.2), borderRadius: BorderRadius.circular(4)),
-                  child: const Text('FINALIZADA', style: TextStyle(fontSize: 10, color: Colors.green, fontWeight: FontWeight.bold)),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                      color: Colors.green.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(4)),
+                  child: const Text('FINALIZADA',
+                      style: TextStyle(
+                          fontSize: 10,
+                          color: Colors.green,
+                          fontWeight: FontWeight.bold)),
                 ),
               ],
             ],
@@ -319,99 +403,102 @@ class _AdminLiveResultsScreenState extends State<AdminLiveResultsScreen> with Si
             indicatorColor: AppTheme.primaryRed,
             labelColor: AppTheme.primaryRed,
             unselectedLabelColor: AppTheme.textSecondary,
-            tabs: _availableSessions.map((s) => Tab(text: _sessionLabel(s))).toList(),
+            tabs: _availableSessions
+                .map((s) => Tab(text: _sessionLabel(s)))
+                .toList(),
           ),
         ),
         // Tab content
         Expanded(
           child: TabBarView(
             controller: _tabController,
-            children: _availableSessions.map((s) => _buildAdminSessionTab(s)).toList(),
+            children:
+                _availableSessions.map((s) => _buildSessionTab(s)).toList(),
           ),
         ),
       ],
     );
   }
 
-  Widget _buildAdminSessionTab(String sessionType) {
+  Widget _buildSessionTab(String sessionType) {
+    final entries = _editingEntries[sessionType] ?? [];
     final session = _sessions[sessionType];
-    final results = (session?['results'] as List?)?.cast<Map<String, dynamic>>() ?? [];
     final updatedAt = session?['updatedAt'];
     final isRace = sessionType == 'race';
+    final hasResults =
+        (session?['results'] as List?)?.isNotEmpty ?? false;
 
     return Column(
       children: [
         // Action bar
         Container(
-          padding: const EdgeInsets.all(12),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
           child: Row(
             children: [
-              // Atualizar da API
+              // Save button
               ElevatedButton.icon(
-                onPressed: _refreshing ? null : () => _refreshSession(sessionType),
-                icon: _refreshing
-                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                  : const Icon(Icons.cloud_download, size: 18),
-                label: Text(_refreshing ? 'Atualizando...' : 'Atualizar da API'),
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.blue),
+                onPressed: _saving ? null : () => _saveSession(sessionType),
+                icon: _saving
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: Colors.white))
+                    : const Icon(Icons.save, size: 18),
+                label: Text(_saving ? 'Salvando...' : 'Salvar Resultados'),
+                style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.green.shade700),
               ),
               const SizedBox(width: 8),
-              // Manual
+              // Reset order
               OutlinedButton.icon(
-                onPressed: () => _openManualMode(sessionType),
-                icon: const Icon(Icons.edit, size: 18),
-                label: const Text('Manual'),
+                onPressed: () {
+                  setState(() {
+                    _editingEntries[sessionType] = _buildEntries(sessionType);
+                  });
+                },
+                icon: const Icon(Icons.refresh, size: 18),
+                label: const Text('Resetar'),
               ),
               const Spacer(),
-              // Timestamp
               if (updatedAt != null)
-                Text('Atualizado: ${_formatTime(updatedAt)}', style: const TextStyle(fontSize: 11, color: Colors.grey)),
-              // Finalizar (so para corrida)
-              if (isRace && results.isNotEmpty) ...[
+                Text('Atualizado: ${_formatTime(updatedAt)}',
+                    style:
+                        const TextStyle(fontSize: 11, color: Colors.grey)),
+              // Finalize (race only)
+              if (isRace && hasResults) ...[
                 const SizedBox(width: 16),
                 ElevatedButton.icon(
                   onPressed: _finalizeResults,
                   icon: const Icon(Icons.send, size: 18),
                   label: const Text('Enviar para Pontuacao'),
-                  style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primaryRed),
+                  style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.primaryRed),
                 ),
               ],
             ],
           ),
         ),
-        // Results table
-        if (results.isEmpty)
-          const Expanded(child: Center(child: Text('Nenhum resultado ainda. Clique em "Atualizar da OpenF1" ou "Manual".',
-            style: TextStyle(color: AppTheme.textSecondary))))
+        // Editable table
+        if (entries.isEmpty)
+          const Expanded(
+              child: Center(
+                  child: Text('Nenhum piloto encontrado.',
+                      style: TextStyle(color: AppTheme.textSecondary))))
         else
           Expanded(
             child: SingleChildScrollView(
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: DataTable(
-                  columnSpacing: 20,
-                  columns: const [
-                    DataColumn(label: Text('Pos', style: TextStyle(fontWeight: FontWeight.bold))),
-                    DataColumn(label: Text('Piloto', style: TextStyle(fontWeight: FontWeight.bold))),
-                    DataColumn(label: Text('Equipe', style: TextStyle(fontWeight: FontWeight.bold))),
-                    DataColumn(label: Text('Tempo', style: TextStyle(fontWeight: FontWeight.bold))),
-                    DataColumn(label: Text('Gap', style: TextStyle(fontWeight: FontWeight.bold))),
-                    DataColumn(label: Text('Pneu', style: TextStyle(fontWeight: FontWeight.bold))),
-                    DataColumn(label: Text('Pits', style: TextStyle(fontWeight: FontWeight.bold))),
-                    DataColumn(label: Text('Status', style: TextStyle(fontWeight: FontWeight.bold))),
-                  ],
-                  rows: results.map((r) {
-                    return DataRow(cells: [
-                      DataCell(Text('${r['position']}', style: const TextStyle(fontWeight: FontWeight.bold))),
-                      DataCell(Text(r['abbreviation'] ?? '${r['firstName'] ?? ''} ${r['lastName'] ?? ''}')),
-                      DataCell(Text(r['teamName'] ?? '', style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary))),
-                      DataCell(Text(r['bestLapTime'] ?? '-')),
-                      DataCell(Text(r['gap'] ?? '-')),
-                      DataCell(Text(r['tireCompound'] ?? '-')),
-                      DataCell(Text('${r['pitStops'] ?? 0}')),
-                      DataCell(Text(r['status'] ?? 'OK', style: TextStyle(color: r['status'] != null ? Colors.red : Colors.green))),
-                    ]);
-                  }).toList(),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: _EditableResultsTable(
+                  entries: entries,
+                  onReorder: (oldIndex, newIndex) {
+                    setState(() {
+                      if (oldIndex < newIndex) newIndex -= 1;
+                      final item = entries.removeAt(oldIndex);
+                      entries.insert(newIndex, item);
+                    });
+                  },
                 ),
               ),
             ),
@@ -419,77 +506,215 @@ class _AdminLiveResultsScreenState extends State<AdminLiveResultsScreen> with Si
       ],
     );
   }
-
-  String _formatTime(String iso) {
-    try {
-      final dt = DateTime.parse(iso).toLocal();
-      return '${dt.day}/${dt.month} ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
-    } catch (_) {
-      return iso;
-    }
-  }
 }
 
-// Dialog para ordenar pilotos manualmente (drag and drop)
-class _ManualOrderDialog extends StatefulWidget {
-  final List<Map<String, dynamic>> drivers;
-  final String sessionType;
+// Data class for a driver entry in the editable table
+class _DriverEntry {
+  final dynamic driverId;
+  final String name;
+  final String fullName;
+  String bestLapTime;
+  String gap;
 
-  const _ManualOrderDialog({required this.drivers, required this.sessionType});
-
-  @override
-  State<_ManualOrderDialog> createState() => _ManualOrderDialogState();
+  _DriverEntry({
+    required this.driverId,
+    required this.name,
+    required this.fullName,
+    required this.bestLapTime,
+    required this.gap,
+  });
 }
 
-class _ManualOrderDialogState extends State<_ManualOrderDialog> {
-  late List<Map<String, dynamic>> _orderedDrivers;
+// Editable table widget with drag-to-reorder rows
+class _EditableResultsTable extends StatelessWidget {
+  final List<_DriverEntry> entries;
+  final void Function(int oldIndex, int newIndex) onReorder;
 
-  @override
-  void initState() {
-    super.initState();
-    _orderedDrivers = List.from(widget.drivers);
-  }
+  const _EditableResultsTable({
+    required this.entries,
+    required this.onReorder,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      backgroundColor: AppTheme.cardBackground,
-      title: Text('Ordenar Pilotos - ${widget.sessionType}'),
-      content: SizedBox(
-        width: 400,
-        height: 500,
-        child: ReorderableListView.builder(
-          itemCount: _orderedDrivers.length,
-          onReorder: (oldIndex, newIndex) {
-            setState(() {
-              if (oldIndex < newIndex) newIndex -= 1;
-              final item = _orderedDrivers.removeAt(oldIndex);
-              _orderedDrivers.insert(newIndex, item);
-            });
+    return Column(
+      children: [
+        // Header
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+          decoration: BoxDecoration(
+            color: AppTheme.primaryRed.withValues(alpha: 0.1),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(8)),
+          ),
+          child: const Row(
+            children: [
+              SizedBox(width: 40),
+              SizedBox(
+                  width: 50,
+                  child: Text('POS',
+                      style: TextStyle(
+                          fontWeight: FontWeight.bold, fontSize: 12))),
+              Expanded(
+                  flex: 3,
+                  child: Text('PILOTO',
+                      style: TextStyle(
+                          fontWeight: FontWeight.bold, fontSize: 12))),
+              Expanded(
+                  flex: 3,
+                  child: Text('VOLTA / GAP',
+                      style: TextStyle(
+                          fontWeight: FontWeight.bold, fontSize: 12))),
+              SizedBox(width: 40),
+            ],
+          ),
+        ),
+        // Rows
+        ReorderableListView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: entries.length,
+          onReorder: onReorder,
+          proxyDecorator: (child, index, animation) {
+            return Material(
+              elevation: 4,
+              color: AppTheme.cardBackground,
+              borderRadius: BorderRadius.circular(4),
+              child: child,
+            );
           },
           itemBuilder: (ctx, i) {
-            final d = _orderedDrivers[i];
-            return ListTile(
-              key: ValueKey(d['driverId']),
-              leading: CircleAvatar(
-                radius: 14,
-                backgroundColor: AppTheme.primaryRed.withValues(alpha: 0.2),
-                child: Text('${i + 1}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-              ),
-              title: Text('${d['abbreviation']} - ${d['name']}', style: const TextStyle(fontSize: 13)),
-              trailing: const Icon(Icons.drag_handle, color: Colors.grey),
+            final entry = entries[i];
+            final pos = i + 1;
+            return _DriverRow(
+              key: ValueKey(entry.driverId),
+              position: pos,
+              entry: entry,
+              isFirst: pos == 1,
             );
           },
         ),
-      ),
-      actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
-        ElevatedButton(
-          onPressed: () => Navigator.pop(context, _orderedDrivers),
-          style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primaryRed),
-          child: const Text('Salvar'),
-        ),
       ],
+    );
+  }
+}
+
+// Single editable row
+class _DriverRow extends StatelessWidget {
+  final int position;
+  final _DriverEntry entry;
+  final bool isFirst;
+
+  const _DriverRow({
+    super.key,
+    required this.position,
+    required this.entry,
+    required this.isFirst,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        border: Border(
+            bottom: BorderSide(color: Colors.grey.shade800, width: 0.5)),
+      ),
+      child: Row(
+        children: [
+          // Drag handle
+          const Icon(Icons.drag_handle, color: Colors.grey, size: 20),
+          const SizedBox(width: 8),
+          // Position
+          SizedBox(
+            width: 42,
+            child: _positionBadge(position),
+          ),
+          // Driver name
+          Expanded(
+            flex: 3,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(entry.name,
+                    style: const TextStyle(
+                        fontWeight: FontWeight.bold, fontSize: 14)),
+                Text(entry.fullName,
+                    style: const TextStyle(
+                        fontSize: 11, color: AppTheme.textSecondary)),
+              ],
+            ),
+          ),
+          // Lap time / Gap input
+          Expanded(
+            flex: 3,
+            child: SizedBox(
+              height: 36,
+              child: TextField(
+                controller: TextEditingController(
+                    text: isFirst ? entry.bestLapTime : entry.gap),
+                onChanged: (v) {
+                  if (isFirst) {
+                    entry.bestLapTime = v;
+                    entry.gap = 'LEADER';
+                  } else {
+                    entry.gap = v;
+                  }
+                },
+                style: const TextStyle(fontSize: 13),
+                decoration: InputDecoration(
+                  hintText: isFirst ? 'Ex: 1:23.456' : 'Ex: +0.234',
+                  hintStyle:
+                      TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                  isDense: true,
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(6),
+                      borderSide: BorderSide(color: Colors.grey.shade700)),
+                  enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(6),
+                      borderSide: BorderSide(color: Colors.grey.shade700)),
+                  focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(6),
+                      borderSide:
+                          const BorderSide(color: AppTheme.primaryRed)),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+        ],
+      ),
+    );
+  }
+
+  Widget _positionBadge(int pos) {
+    Color bg;
+    Color fg;
+    if (pos == 1) {
+      bg = const Color(0xFFFFD700);
+      fg = Colors.black;
+    } else if (pos == 2) {
+      bg = const Color(0xFFC0C0C0);
+      fg = Colors.black;
+    } else if (pos == 3) {
+      bg = const Color(0xFFCD7F32);
+      fg = Colors.white;
+    } else {
+      bg = Colors.grey.shade800;
+      fg = Colors.white;
+    }
+    return Container(
+      width: 28,
+      height: 28,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Text('$pos',
+          style: TextStyle(
+              fontWeight: FontWeight.bold, fontSize: 13, color: fg)),
     );
   }
 }

@@ -155,9 +155,9 @@ async function manualSessionResults(req, res, next) {
       await pool.query(
         `INSERT INTO session_results (race_id, session_type, driver_id, position, updated_at)
          VALUES ($1, $2, $3, $4, NOW())`,
-        [raceId, sessionType, r.driverId, r.position]
+        [raceId, sessionType, r.driverId, r.position, r.bestLapTime || null, r.gap || null]
       );
-      insertedResults.push({ driverId: r.driverId, position: r.position });
+      insertedResults.push({ driverId: r.driverId, position: r.position, bestLapTime: r.bestLapTime || null, gap: r.gap || null });
     }
 
     // Emite atualizacao via socket
