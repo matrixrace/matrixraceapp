@@ -45,7 +45,7 @@ async function refreshSessionFromAPI(req, res, next) {
       return res.status(502).json({
         success: false,
         message: `Erro ao buscar dados da OpenF1: ${apiError.message}`,
-        manualFallback: true,
+        data: { manualFallback: true },
       });
     }
 
