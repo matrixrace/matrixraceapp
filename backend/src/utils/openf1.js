@@ -1,9 +1,9 @@
 const https = require('https');
 const logger = require('./logger');
 
-const BASE_URL = 'https://api.openf1.org/v1';
+const BASE_URL = 'https://api.formula1dashboard.com/api/v1';
 
-// Mapeamento session_type interno -> nome OpenF1
+// Mapeamento session_type interno -> nome na API
 const SESSION_TYPE_MAP = {
   'FP1': 'Practice 1',
   'FP2': 'Practice 2',
@@ -14,13 +14,46 @@ const SESSION_TYPE_MAP = {
   'race': 'Race',
 };
 
-// Faz requisicao HTTPS para a OpenF1 API
-function fetchOpenF1(path) {
-  const url = `${BASE_URL}${path}`;
-  logger.info(`OpenF1 request: ${url}`);
+// Mapeamento country code (nosso DB) -> country name (API)
+const COUNTRY_MAP = {
+  'AUS': 'Australia',
+  'CHN': 'China',
+  'JPN': 'Japan',
+  'BHR': 'Bahrain',
+  'SAU': 'Saudi Arabia',
+  'USA': 'United States',
+  'CAN': 'Canada',
+  'MCO': 'Monaco',
+  'ESP': 'Spain',
+  'AUT': 'Austria',
+  'GBR': 'Great Britain',
+  'BEL': 'Belgium',
+  'HUN': 'Hungary',
+  'NLD': 'Netherlands',
+  'ITA': 'Italy',
+  'AZE': 'Azerbaijan',
+  'SGP': 'Singapore',
+  'MEX': 'Mexico',
+  'BRA': 'Brazil',
+  'QAT': 'Qatar',
+  'ARE': 'Abu Dhabi',
+  'UAE': 'Abu Dhabi',
+  'LAS': 'Las Vegas',
+  'EMI': 'Emilia-Romagna',
+};
+
+// Cache para sessoes (evita chamar /sessions a cada refresh)
+let _sessionsCache = null;
+let _sessionsCacheTime = 0;
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutos
+
+// Faz requisicao HTTPS para a Formula1Dashboard API
+function fetchAPI(path) {
+  const url = path.startsWith('http') ? path : BASE_URL + path;
+  logger.info('F1Dashboard API request: ' + url);
 
   return new Promise((resolve, reject) => {
-    https.get(url, { timeout: 20000 }, (resp) => {
+    https.get(url, { timeout: 30000 }, (resp) => {
       let data = '';
       resp.on('data', (chunk) => { data += chunk; });
       resp.on('end', () => {
@@ -28,122 +61,144 @@ function fetchOpenF1(path) {
           const parsed = JSON.parse(data);
           resolve(parsed);
         } catch (e) {
-          reject(new Error('Falha ao parsear resposta da OpenF1 API'));
+          reject(new Error('Falha ao parsear resposta da F1Dashboard API'));
         }
       });
     }).on('error', (err) => {
       reject(err);
     }).on('timeout', function () {
       this.destroy();
-      reject(new Error('Timeout ao chamar OpenF1 API'));
+      reject(new Error('Timeout ao chamar F1Dashboard API'));
     });
   });
 }
 
-// Busca o session_key para uma sessao especifica
-async function getSessionKey(year, round, sessionType) {
-  const sessionName = SESSION_TYPE_MAP[sessionType];
-  if (!sessionName) throw new Error(`Tipo de sessao invalido: ${sessionType}`);
-
-  // Primeiro busca o meeting (GP) pelo ano e round
-  const meetings = await fetchOpenF1(`/meetings?year=${year}`);
-  if (!Array.isArray(meetings) || meetings.length === 0) {
-    throw new Error(`Nenhum meeting encontrado para ${year}`);
+// Busca sessoes com cache
+async function getSessions() {
+  const now = Date.now();
+  if (_sessionsCache && (now - _sessionsCacheTime) < CACHE_TTL) {
+    return _sessionsCache;
   }
-
-  // Ordena meetings por data e pega o round correto (1-indexed)
-  const sorted = meetings.sort((a, b) => new Date(a.date_start) - new Date(b.date_start));
-  const meeting = sorted[round - 1];
-  if (!meeting) {
-    throw new Error(`Round ${round} nao encontrado em ${year}`);
-  }
-
-  // Busca sessoes desse meeting
-  const sessions = await fetchOpenF1(`/sessions?meeting_key=${meeting.meeting_key}&session_name=${encodeURIComponent(sessionName)}`);
+  const sessions = await fetchAPI('/sessions');
   if (!Array.isArray(sessions) || sessions.length === 0) {
-    throw new Error(`Sessao ${sessionName} nao encontrada para ${meeting.meeting_name}`);
+    throw new Error('Nenhuma sessao encontrada na API');
   }
-
-  return sessions[0].session_key;
+  _sessionsCache = sessions;
+  _sessionsCacheTime = now;
+  return sessions;
 }
 
-// Busca posicoes mais recentes de cada piloto na sessao
-async function getPositions(sessionKey) {
-  const data = await fetchOpenF1(`/position?session_key=${sessionKey}`);
-  if (!Array.isArray(data)) return [];
+// Busca o meeting_key para uma corrida do nosso DB
+// Usa country code para matching ao inves de round index
+async function findMeeting(year, countryCode, raceName) {
+  const sessions = await getSessions();
 
-  // Agrupa por driver_number, pega a posicao mais recente
-  const latest = {};
-  for (const entry of data) {
-    const dn = entry.driver_number;
-    if (!latest[dn] || new Date(entry.date) > new Date(latest[dn].date)) {
-      latest[dn] = entry;
+  // Filtra sessoes do ano correto (exclui pre-season tests que nao tem Race)
+  const yearSessions = sessions.filter(s => {
+    if (!s.date_start) return false;
+    const sYear = new Date(s.date_start).getFullYear();
+    return sYear === year;
+  });
+
+  // Agrupa por meeting_key
+  const meetings = {};
+  for (const s of yearSessions) {
+    if (!meetings[s.meeting_key]) {
+      meetings[s.meeting_key] = {
+        meeting_key: s.meeting_key,
+        country: s.grand_prix?.country || '',
+        sessions: [],
+        firstDate: s.date_start,
+      };
     }
+    meetings[s.meeting_key].sessions.push(s);
   }
 
-  return Object.values(latest).sort((a, b) => a.position - b.position);
-}
+  // Filtra meetings que tem sessoes reais (nao pre-season tests)
+  const realMeetings = Object.values(meetings).filter(m =>
+    m.sessions.some(s => ['Practice 1', 'Qualifying', 'Race'].includes(s.session_name))
+  );
 
-// Busca melhor volta de cada piloto
-async function getBestLaps(sessionKey) {
-  const data = await fetchOpenF1(`/laps?session_key=${sessionKey}`);
-  if (!Array.isArray(data)) return {};
+  // Tenta match por country code
+  const apiCountry = COUNTRY_MAP[countryCode] || '';
+  let match = realMeetings.find(m =>
+    m.country.toLowerCase() === apiCountry.toLowerCase()
+  );
 
-  // Agrupa por driver_number, pega o menor lap_duration
-  const best = {};
-  for (const lap of data) {
-    const dn = lap.driver_number;
-    if (lap.lap_duration && (!best[dn] || lap.lap_duration < best[dn].lap_duration)) {
-      best[dn] = lap;
-    }
+  // Fallback: tenta match parcial pelo nome do pais
+  if (!match && raceName) {
+    const nameWords = raceName.toLowerCase().split(/[\s-]+/);
+    match = realMeetings.find(m => {
+      const mc = m.country.toLowerCase();
+      return nameWords.some(w => mc.includes(w) || w.includes(mc));
+    });
   }
 
-  return best;
-}
-
-// Busca stints (pneus) de cada piloto
-async function getStints(sessionKey) {
-  const data = await fetchOpenF1(`/stints?session_key=${sessionKey}`);
-  if (!Array.isArray(data)) return {};
-
-  // Agrupa por driver_number, pega o stint mais recente
-  const latest = {};
-  for (const stint of data) {
-    const dn = stint.driver_number;
-    if (!latest[dn] || stint.stint_number > latest[dn].stint_number) {
-      latest[dn] = stint;
-    }
+  if (!match) {
+    throw new Error('Corrida nao encontrada na API para ' + countryCode + ' (' + apiCountry + ') em ' + year);
   }
 
-  return latest;
+  return match;
 }
 
-// Busca pit stops de cada piloto
-async function getPitStops(sessionKey) {
-  const data = await fetchOpenF1(`/pit?session_key=${sessionKey}`);
-  if (!Array.isArray(data)) return {};
+// Formata gap para string
+function formatGap(gap) {
+  if (gap === null || gap === undefined) return null;
+  if (gap === 0) return 'LEADER';
+  return '+' + Number(gap).toFixed(3);
+}
 
-  // Conta pit stops por driver_number
-  const counts = {};
-  for (const pit of data) {
-    const dn = pit.driver_number;
-    counts[dn] = (counts[dn] || 0) + 1;
+// Busca todos os dados de uma sessao e retorna formatado
+// Agora recebe countryCode e raceName do nosso DB em vez de round
+async function fetchSessionData(year, round, sessionType, countryCode, raceName) {
+  const sessionName = SESSION_TYPE_MAP[sessionType];
+  if (!sessionName) throw new Error('Tipo de sessao invalido: ' + sessionType);
+
+  const meeting = await findMeeting(year, countryCode, raceName);
+  logger.info('Match encontrado: ' + meeting.country + ' (meeting_key=' + meeting.meeting_key + ')');
+
+  // Verifica se a sessao especifica existe neste meeting
+  const sessionInfo = meeting.sessions.find(s => s.session_name === sessionName);
+  if (!sessionInfo) {
+    throw new Error('Sessao ' + sessionName + ' nao encontrada para ' + meeting.country);
   }
 
-  return counts;
-}
+  // Busca resultados pelo meeting_key
+  const results = await fetchAPI('/results?meeting_key=' + meeting.meeting_key);
 
-// Busca mensagens de direcao de prova
-async function getRaceControlMessages(sessionKey) {
-  const data = await fetchOpenF1(`/race_control?session_key=${sessionKey}`);
-  if (!Array.isArray(data)) return [];
+  if (!Array.isArray(results) || results.length === 0) {
+    throw new Error('Nenhum resultado encontrado para ' + meeting.country + '. A sessao pode nao ter acontecido ainda.');
+  }
 
-  return data.map((msg) => ({
-    message: msg.message || '',
-    flag: msg.flag || null,
-    driverNumber: msg.driver_number || null,
-    happenedAt: msg.date || new Date().toISOString(),
+  // Filtra pela sessao correta
+  const sessionResults = results
+    .filter(r => r.session_type === sessionName)
+    .sort((a, b) => a.position - b.position);
+
+  if (sessionResults.length === 0) {
+    throw new Error('Nenhum resultado para ' + sessionName + ' em ' + meeting.country + '. A sessao pode nao ter acontecido ainda.');
+  }
+
+  // Monta resultado formatado
+  const formattedResults = sessionResults.map((r) => ({
+    driverNumber: r.driver_season?.driver?.driver_number || null,
+    position: r.position,
+    bestLapTime: r.time || null,
+    gap: formatGap(r.gap_to_leader),
+    tireCompound: null,
+    pitStops: 0,
+    status: r.completion_status_code || null,
+    driverCode: r.driver_season?.driver?.code || null,
+    driverName: r.driver_name || null,
+    teamName: r.team_name || null,
+    laps: r.laps || null,
+    points: r.points || null,
   }));
+
+  let raceControl = [];
+
+  logger.info('Sessao ' + sessionName + ' de ' + meeting.country + ': ' + formattedResults.length + ' pilotos');
+  return { results: formattedResults, raceControl };
 }
 
 // Formata duracao em segundos para "M:SS.mmm"
@@ -151,88 +206,15 @@ function formatLapTime(durationSeconds) {
   if (!durationSeconds) return null;
   const minutes = Math.floor(durationSeconds / 60);
   const seconds = (durationSeconds % 60).toFixed(3);
-  return `${minutes}:${seconds.padStart(6, '0')}`;
-}
-
-// Busca todos os dados de uma sessao e retorna formatado
-async function fetchSessionData(year, round, sessionType) {
-  const sessionKey = await getSessionKey(year, round, sessionType);
-
-  // Busca dados em paralelo
-  const [positions, bestLaps, stints, pitStops, raceControl] = await Promise.all([
-    getPositions(sessionKey),
-    getBestLaps(sessionKey),
-    getStints(sessionKey),
-    getPitStops(sessionKey),
-    getRaceControlMessages(sessionKey),
-  ]);
-
-  // Monta resultado final por piloto
-  const results = positions.map((pos) => {
-    const dn = pos.driver_number;
-    const lap = bestLaps[dn];
-    const stint = stints[dn];
-    const pits = pitStops[dn] || 0;
-
-    return {
-      driverNumber: dn,
-      position: pos.position,
-      bestLapTime: lap ? formatLapTime(lap.lap_duration) : null,
-      gap: null, // Gap sera calculado no controller
-      tireCompound: stint ? (stint.compound || '').toUpperCase() : null,
-      pitStops: pits,
-      status: null,
-    };
-  });
-
-  // Calcula gaps (diferenca de tempo para o lider)
-  const leaderLap = bestLaps[results[0]?.driverNumber];
-  if (leaderLap && leaderLap.lap_duration) {
-    for (const r of results) {
-      if (r.position === 1) {
-        r.gap = 'LEADER';
-      } else {
-        const driverLap = bestLaps[r.driverNumber];
-        if (driverLap && driverLap.lap_duration) {
-          const diff = driverLap.lap_duration - leaderLap.lap_duration;
-          r.gap = `+${diff.toFixed(3)}`;
-        }
-      }
-    }
-  }
-
-  return { results, raceControl };
-}
-
-// Busca informacoes dos pilotos da OpenF1 (para mapeamento driver_number -> info)
-async function getDrivers(sessionKey) {
-  const data = await fetchOpenF1(`/drivers?session_key=${sessionKey}`);
-  if (!Array.isArray(data)) return {};
-
-  const drivers = {};
-  for (const d of data) {
-    drivers[d.driver_number] = {
-      driverNumber: d.driver_number,
-      abbreviation: d.name_acronym,
-      firstName: d.first_name,
-      lastName: d.last_name,
-      teamName: d.team_name,
-    };
-  }
-
-  return drivers;
+  return minutes + ':' + seconds.padStart(6, '0');
 }
 
 module.exports = {
-  fetchOpenF1,
-  getSessionKey,
-  getPositions,
-  getBestLaps,
-  getStints,
-  getPitStops,
-  getRaceControlMessages,
+  fetchAPI,
+  findMeeting,
   fetchSessionData,
-  getDrivers,
   formatLapTime,
+  formatGap,
   SESSION_TYPE_MAP,
+  COUNTRY_MAP,
 };

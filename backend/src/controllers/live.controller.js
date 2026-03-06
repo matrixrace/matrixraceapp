@@ -39,12 +39,12 @@ async function refreshSessionFromAPI(req, res, next) {
     // Busca dados da OpenF1 API
     let apiData;
     try {
-      apiData = await fetchSessionData(race.season, race.round, sessionType);
+      apiData = await fetchSessionData(race.season, race.round, sessionType, race.country, race.name);
     } catch (apiError) {
       logger.error('OpenF1 API error:', apiError.message);
       return res.status(502).json({
         success: false,
-        message: `Erro ao buscar dados da OpenF1: ${apiError.message}`,
+        message: `Erro ao buscar dados da API: ${apiError.message}`,
         data: { manualFallback: true },
       });
     }
