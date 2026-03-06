@@ -29,29 +29,29 @@ const teamsData = [
 
 // Pilotos da F1 2026
 const driversData = [
-  { first_name: 'Lando', last_name: 'Norris', number: 1, nationality: 'GBR', team: 'McLaren' },
-  { first_name: 'Oscar', last_name: 'Piastri', number: 81, nationality: 'AUS', team: 'McLaren' },
-  { first_name: 'George', last_name: 'Russell', number: 63, nationality: 'GBR', team: 'Mercedes' },
-  { first_name: 'Kimi', last_name: 'Antonelli', number: 12, nationality: 'ITA', team: 'Mercedes' },
-  { first_name: 'Max', last_name: 'Verstappen', number: 3, nationality: 'NLD', team: 'Red Bull Racing' },
-  { first_name: 'Isack', last_name: 'Hadjar', number: 6, nationality: 'FRA', team: 'Red Bull Racing' },
-  { first_name: 'Charles', last_name: 'Leclerc', number: 16, nationality: 'MCO', team: 'Ferrari' },
-  { first_name: 'Lewis', last_name: 'Hamilton', number: 44, nationality: 'GBR', team: 'Ferrari' },
-  { first_name: 'Alexander', last_name: 'Albon', number: 23, nationality: 'THA', team: 'Williams' },
-  { first_name: 'Carlos', last_name: 'Sainz', number: 55, nationality: 'ESP', team: 'Williams' },
-  { first_name: 'Liam', last_name: 'Lawson', number: 30, nationality: 'NZL', team: 'Racing Bulls' },
-  { first_name: 'Arvid', last_name: 'Lindblad', number: 41, nationality: 'GBR', team: 'Racing Bulls' },
-  { first_name: 'Fernando', last_name: 'Alonso', number: 14, nationality: 'ESP', team: 'Aston Martin' },
-  { first_name: 'Lance', last_name: 'Stroll', number: 18, nationality: 'CAN', team: 'Aston Martin' },
-  { first_name: 'Pierre', last_name: 'Gasly', number: 10, nationality: 'FRA', team: 'Alpine' },
-  { first_name: 'Franco', last_name: 'Colapinto', number: 43, nationality: 'ARG', team: 'Alpine' },
-  { first_name: 'Esteban', last_name: 'Ocon', number: 31, nationality: 'FRA', team: 'Haas' },
-  { first_name: 'Oliver', last_name: 'Bearman', number: 87, nationality: 'GBR', team: 'Haas' },
-  { first_name: 'Nico', last_name: 'Hulkenberg', number: 27, nationality: 'DEU', team: 'Audi' },
-  { first_name: 'Gabriel', last_name: 'Bortoleto', number: 5, nationality: 'BRA', team: 'Audi' },
-  { first_name: 'Sergio', last_name: 'Perez', number: 11, nationality: 'MEX', team: 'Cadillac' },
-  { first_name: 'Valtteri', last_name: 'Bottas', number: 77, nationality: 'FIN', team: 'Cadillac' },
-];
+  { first_name: 'Lando',     last_name: 'Norris',     number: 1,  nationality: 'GBR', country: 'Reino Unido',   abbreviation: 'NOR', team: 'McLaren' },
+  { first_name: 'Oscar',     last_name: 'Piastri',    number: 81, nationality: 'AUS', country: 'Australia',     abbreviation: 'PIA', team: 'McLaren' },
+  { first_name: 'George',    last_name: 'Russell',    number: 63, nationality: 'GBR', country: 'Reino Unido',   abbreviation: 'RUS', team: 'Mercedes' },
+  { first_name: 'Kimi',      last_name: 'Antonelli',  number: 12, nationality: 'ITA', country: 'Italia',        abbreviation: 'ANT', team: 'Mercedes' },
+  { first_name: 'Max',       last_name: 'Verstappen', number: 3,  nationality: 'NLD', country: 'Holanda',       abbreviation: 'VER', team: 'Red Bull Racing' },
+  { first_name: 'Isack',     last_name: 'Hadjar',     number: 6,  nationality: 'FRA', country: 'Franca',        abbreviation: 'HAD', team: 'Red Bull Racing' },
+  { first_name: 'Charles',   last_name: 'Leclerc',    number: 16, nationality: 'MCO', country: 'Monaco',        abbreviation: 'LEC', team: 'Ferrari' },
+  { first_name: 'Lewis',     last_name: 'Hamilton',   number: 44, nationality: 'GBR', country: 'Reino Unido',   abbreviation: 'HAM', team: 'Ferrari' },
+  { first_name: 'Alexander', last_name: 'Albon',      number: 23, nationality: 'THA', country: 'Tailandia',     abbreviation: 'ALB', team: 'Williams' },
+  { first_name: 'Carlos',    last_name: 'Sainz',      number: 55, nationality: 'ESP', country: 'Espanha',       abbreviation: 'SAI', team: 'Williams' },
+  { first_name: 'Liam',      last_name: 'Lawson',     number: 30, nationality: 'NZL', country: 'Nova Zelandia', abbreviation: 'LAW', team: 'Racing Bulls' },
+  { first_name: 'Arvid',     last_name: 'Lindblad',   number: 41, nationality: 'GBR', country: 'Reino Unido',   abbreviation: 'LIN', team: 'Racing Bulls' },
+  { first_name: 'Fernando',  last_name: 'Alonso',     number: 14, nationality: 'ESP', country: 'Espanha',       abbreviation: 'ALO', team: 'Aston Martin' },
+  { first_name: 'Lance',     last_name: 'Stroll',     number: 18, nationality: 'CAN', country: 'Canada',        abbreviation: 'STR', team: 'Aston Martin' },
+  { first_name: 'Pierre',    last_name: 'Gasly',      number: 10, nationality: 'FRA', country: 'Franca',        abbreviation: 'GAS', team: 'Alpine' },
+  { first_name: 'Franco',    last_name: 'Colapinto',  number: 43, nationality: 'ARG', country: 'Argentina',     abbreviation: 'COL', team: 'Alpine' },
+  { first_name: 'Esteban',   last_name: 'Ocon',       number: 31, nationality: 'FRA', country: 'Franca',        abbreviation: 'OCO', team: 'Haas' },
+  { first_name: 'Oliver',    last_name: 'Bearman',    number: 87, nationality: 'GBR', country: 'Reino Unido',   abbreviation: 'BEA', team: 'Haas' },
+  { first_name: 'Nico',      last_name: 'Hulkenberg', number: 27, nationality: 'DEU', country: 'Alemanha',      abbreviation: 'HUL', team: 'Audi' },
+  { first_name: 'Gabriel',   last_name: 'Bortoleto',  number: 5,  nationality: 'BRA', country: 'Brasil',        abbreviation: 'BOR', team: 'Audi' },
+  { first_name: 'Sergio',    last_name: 'Perez',      number: 11, nationality: 'MEX', country: 'Mexico',        abbreviation: 'PER', team: 'Cadillac' },
+  { first_name: 'Valtteri',  last_name: 'Bottas',     number: 77, nationality: 'FIN', country: 'Finlandia',     abbreviation: 'BOT', team: 'Cadillac' },
+];;
 
 // Corridas F1 2026 com datas aproximadas de FP1 e Classificação
 // fp1_date = Sexta, qualifying_date = Sábado, race_date = Domingo
@@ -121,9 +121,9 @@ async function seed() {
       const teamResult = await client.query('SELECT id FROM teams WHERE name = $1', [driver.team]);
       const teamId = teamResult.rows[0]?.id;
       await client.query(
-        `INSERT INTO drivers (first_name, last_name, number, nationality, team_id)
-         VALUES ($1, $2, $3, $4, $5) ON CONFLICT DO NOTHING`,
-        [driver.first_name, driver.last_name, driver.number, driver.nationality, teamId]
+        `INSERT INTO drivers (first_name, last_name, number, nationality, country, abbreviation, team_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7) ON CONFLICT DO NOTHING`,
+        [driver.first_name, driver.last_name, driver.number, driver.nationality, driver.country, driver.abbreviation, teamId]
       );
     }
     console.log(`✓ ${driversData.length} pilotos inseridos`);

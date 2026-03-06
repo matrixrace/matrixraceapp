@@ -10,6 +10,8 @@ const drivers = pgTable('drivers', {
   number: integer('number'),
   photoUrl: text('photo_url'),
   nationality: varchar('nationality', { length: 3 }), // ISO country code (BRA, GBR, etc)
+  country: varchar('country', { length: 100 }), // Nome do pais (ex: Brasil, Reino Unido)
+  abbreviation: varchar('abbreviation', { length: 3 }), // Sigla nas transmissoes (ex: HAM, ALO)
   isActive: boolean('is_active').default(true),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),

@@ -54,6 +54,10 @@ class SocketService {
   final _typingController = StreamController<TypingEvent>.broadcast();
   final _readReceiptController = StreamController<ReadReceiptEvent>.broadcast();
   final _errorController = StreamController<String>.broadcast();
+  final _sessionResultsController =
+      StreamController<Map<String, dynamic>>.broadcast();
+  final _raceFinalizedController =
+      StreamController<Map<String, dynamic>>.broadcast();
 
   Stream<Map<String, dynamic>> get newMessageStream =>
       _newMessageController.stream;
@@ -66,6 +70,8 @@ class SocketService {
   Stream<ReadReceiptEvent> get readReceiptStream =>
       _readReceiptController.stream;
   Stream<String> get errorStream => _errorController.stream;
+  Stream<Map<String, dynamic>> get sessionResultsStream => _sessionResultsController.stream;
+  Stream<Map<String, dynamic>> get raceFinalizedStream => _raceFinalizedController.stream;
 
   final Set<String> _onlineUsers = {};
   Set<String> get onlineUsers => _onlineUsers;
@@ -201,6 +207,15 @@ class SocketService {
       ));
     });
 
+    // Live results
+    _socket!.on('session_results_updated', (data) {
+      _sessionResultsController.add(Map<String, dynamic>.from(data));
+    });
+
+    _socket!.on('race_finalized', (data) {
+      _raceFinalizedController.add(Map<String, dynamic>.from(data));
+    });
+
     // Erros
     _socket!.on('error', (data) {
       final msg = data is Map ? data['message'] ?? 'Erro' : data.toString();
@@ -247,8 +262,8 @@ class SocketService {
 
   void startTyping({String? receiverId, String? groupId}) {
     _socket?.emit('typing_start', {
-      if (receiverId != null) 'receiverId': receiverId,
-      if (groupId != null) 'groupId': groupId,
+      'receiverId': ?receiverId,
+      'groupId': ?groupId,
     });
 
     // Auto-stop após 2s
@@ -261,8 +276,8 @@ class SocketService {
   void stopTyping({String? receiverId, String? groupId}) {
     _typingTimer?.cancel();
     _socket?.emit('typing_stop', {
-      if (receiverId != null) 'receiverId': receiverId,
-      if (groupId != null) 'groupId': groupId,
+      'receiverId': ?receiverId,
+      'groupId': ?groupId,
     });
   }
 
@@ -271,8 +286,18 @@ class SocketService {
     if (messageIds.isEmpty) return;
     _socket?.emit('mark_read', {
       'messageIds': messageIds,
-      if (senderId != null) 'senderId': senderId,
+      'senderId': ?senderId,
     });
+  }
+
+  /// Entra na sala de uma corrida (live updates)
+  void joinRace(int raceId) {
+    _socket?.emit('join_race', raceId);
+  }
+
+  /// Sai da sala de uma corrida
+  void leaveRace(int raceId) {
+    _socket?.emit('leave_race', raceId);
   }
 
   /// Desconecta
@@ -295,5 +320,7 @@ class SocketService {
     _typingController.close();
     _readReceiptController.close();
     _errorController.close();
+    _sessionResultsController.close();
+    _raceFinalizedController.close();
   }
 }

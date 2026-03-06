@@ -21,6 +21,7 @@ import '../features/f1results/presentation/screens/f1_results_screen.dart';
 import '../features/profile/presentation/screens/user_profile_screen.dart';
 import '../features/admin/presentation/screens/admin_user_leagues_screen.dart';
 import '../features/how_it_works/presentation/screens/how_it_works_screen.dart';
+import '../features/live/presentation/screens/live_screen.dart';
 
 /// Configuração de rotas do app
 class AppRouter {
@@ -56,6 +57,10 @@ class AppRouter {
           GoRoute(
             path: '/profile',
             builder: (context, state) => const ProfileScreen(),
+          ),
+          GoRoute(
+            path: '/live',
+            builder: (context, state) => const LiveScreen(),
           ),
           GoRoute(
             path: '/f1-results',
@@ -181,6 +186,11 @@ class AppRouter {
         path: '/admin/users',
         builder: (context, state) =>
             const AdminShellScreen(section: 'users'),
+      ),
+      GoRoute(
+        path: '/admin/live-results',
+        builder: (context, state) =>
+            const AdminShellScreen(section: 'live_results'),
       ),
       GoRoute(
         path: '/admin/user-leagues',

@@ -596,9 +596,15 @@ async function syncRaceSchedule(req, res, next) {
 
       if (!raceDate) continue;
 
+      // Sprint weekend: Jolpica retorna Sprint e SprintQualifying
+      const sprintQualifyingDate = toUTC(jr.SprintQualifying?.date, jr.SprintQualifying?.time)
+                                || toUTC(jr.SprintShootout?.date, jr.SprintShootout?.time);
+      const sprintDate = toUTC(jr.Sprint?.date, jr.Sprint?.time);
+      const isSprintWeekend = !!(sprintDate || sprintQualifyingDate);
+
       await pool.query(
-        `INSERT INTO races (name, location, country, circuit_name, fp1_date, qualifying_date, race_date, season, round)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        `INSERT INTO races (name, location, country, circuit_name, fp1_date, qualifying_date, race_date, sprint_qualifying_date, sprint_date, is_sprint_weekend, season, round)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
          ON CONFLICT (season, round) DO UPDATE
          SET name = EXCLUDED.name,
              location = EXCLUDED.location,
@@ -607,6 +613,9 @@ async function syncRaceSchedule(req, res, next) {
              fp1_date = EXCLUDED.fp1_date,
              qualifying_date = EXCLUDED.qualifying_date,
              race_date = EXCLUDED.race_date,
+             sprint_qualifying_date = EXCLUDED.sprint_qualifying_date,
+             sprint_date = EXCLUDED.sprint_date,
+             is_sprint_weekend = EXCLUDED.is_sprint_weekend,
              updated_at = NOW()`,
         [
           jr.raceName,
@@ -616,6 +625,9 @@ async function syncRaceSchedule(req, res, next) {
           fp1Date,
           qualifyingDate,
           raceDate,
+          sprintQualifyingDate,
+          sprintDate,
+          isSprintWeekend,
           year,
           round,
         ]
@@ -671,6 +683,7 @@ async function syncDriversAndTeams(req, res, next) {
       for (const d of drivers) {
         const number = d.permanentNumber ? parseInt(d.permanentNumber) : null;
         const nationality = (d.nationality || '').substring(0, 3).toUpperCase();
+        const abbreviation = (d.code || '').toUpperCase() || null;
 
         await pool.query(
           `INSERT INTO drivers (first_name, last_name, number, nationality, team_id, is_active)
@@ -679,11 +692,12 @@ async function syncDriversAndTeams(req, res, next) {
           [d.givenName, d.familyName, number, nationality, teamId]
         );
 
-        // Verifica se já existe pelo nome e atualiza team_id
+        // Verifica se já existe pelo nome e atualiza team_id e abbreviation
         await pool.query(
-          `UPDATE drivers SET team_id = $1, is_active = true, updated_at = NOW()
+          `UPDATE drivers SET team_id = $1, is_active = true, updated_at = NOW(),
+           abbreviation = COALESCE(abbreviation, $4)
            WHERE first_name = $2 AND last_name = $3`,
-          [teamId, d.givenName, d.familyName]
+          [teamId, d.givenName, d.familyName, abbreviation]
         );
 
         driversUpserted++;

@@ -28,6 +28,8 @@ const createDriverSchema = z.object({
   lastName: z.string().min(1, 'Sobrenome é obrigatório').max(50),
   number: z.number().int().min(0).max(99).optional().nullable(),
   nationality: z.string().length(3, 'Nacionalidade deve ter 3 letras (ISO)').optional(),
+  country: z.string().max(100).optional().nullable(),
+  abbreviation: z.string().length(3, 'Abreviacao deve ter 3 letras').optional().nullable(),
   isActive: z.boolean().optional(),
 });
 
@@ -105,6 +107,17 @@ const inviteSchema = z.object({
   email: z.string().email('Email inválido'),
 });
 
+
+// --- Manual Session Results (Admin Live) ---
+const manualSessionResultsSchema = z.object({
+  results: z.array(
+    z.object({
+      driverId: z.number().int().positive('ID do piloto invalido'),
+      position: z.number().int().min(1, 'Posicao deve ser >= 1'),
+    })
+  ).min(1, 'Pelo menos 1 resultado e necessario'),
+});
+
 module.exports = {
   registerSchema,
   createTeamSchema,
@@ -120,4 +133,5 @@ module.exports = {
   createOfficialLeagueSchema,
   updateOfficialLeagueSchema,
   inviteSchema,
+  manualSessionResultsSchema,
 };

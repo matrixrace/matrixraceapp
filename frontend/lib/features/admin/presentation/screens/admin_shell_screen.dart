@@ -10,6 +10,7 @@ import 'admin_teams_screen.dart';
 import 'admin_leagues_screen.dart';
 import 'admin_ai_order_screen.dart';
 import 'admin_users_screen.dart';
+import 'admin_live_results_screen.dart';
 
 /// Painel Administrativo — container com sidebar de navegação
 /// Acessível apenas pelo admin. Possui login próprio na mesma página.
@@ -119,6 +120,7 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
     {'key': 'dashboard', 'label': 'Dashboard',  'icon': Icons.dashboard},
     {'key': 'races',     'label': 'Corridas',   'icon': Icons.flag},
     {'key': 'results',   'label': 'Resultados', 'icon': Icons.emoji_events},
+    {'key': 'live_results', 'label': 'Live',       'icon': Icons.live_tv},
     {'key': 'drivers',   'label': 'Pilotos',    'icon': Icons.person},
     {'key': 'teams',     'label': 'Equipes',    'icon': Icons.groups},
     {'key': 'leagues',   'label': 'Ligas Of.',  'icon': Icons.verified},
@@ -130,6 +132,7 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
     switch (_currentSection) {
       case 'races':    return const AdminRacesScreen();
       case 'results':  return const AdminResultsScreen();
+      case 'live_results': return const AdminLiveResultsScreen();
       case 'drivers':  return const AdminDriversScreen();
       case 'teams':    return const AdminTeamsScreen();
       case 'leagues':  return const AdminLeaguesScreen();

@@ -24,6 +24,7 @@ const messagesRoutes = require('./routes/messages.routes');
 const notificationsRoutes = require('./routes/notifications.routes');
 const f1ResultsRoutes = require('./routes/f1results.routes');
 const chatGroupsRoutes = require('./routes/chatGroups.routes');
+const liveRoutes = require('./routes/live.routes');
 
 // Cria o app Express e o servidor HTTP (necessário para Socket.io)
 const app = express();
@@ -100,6 +101,7 @@ app.use('/api/v1/messages', messagesRoutes);
 app.use('/api/v1/notifications', notificationsRoutes);
 app.use('/api/v1/f1-results', f1ResultsRoutes);
 app.use('/api/v1/chat-groups', chatGroupsRoutes);
+app.use('/api/v1/live', liveRoutes);
 
 // ==================
 // PROXY: Firebase Auth Handler (necessário para custom authDomain)

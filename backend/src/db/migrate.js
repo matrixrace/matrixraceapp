@@ -75,6 +75,11 @@ async function migrate() {
     `);
     console.log('✓ Tabela drivers criada');
 
+    // Adiciona colunas country e abbreviation em drivers (se não existirem)
+    await client.query(`ALTER TABLE drivers ADD COLUMN IF NOT EXISTS country VARCHAR(100)`);
+    await client.query(`ALTER TABLE drivers ADD COLUMN IF NOT EXISTS abbreviation VARCHAR(3)`);
+    console.log('✓ Colunas country/abbreviation garantidas em drivers');
+
     // Tabela de corridas (com datas de FP1 e Classificação para controle de palpites)
     await client.query(`
       CREATE TABLE IF NOT EXISTS races (
@@ -472,6 +477,55 @@ async function migrate() {
     `);
     console.log('✓ Tabela message_read_receipts criada');
 
+    // =============================================
+    // LIVE: COLUNAS SPRINT EM RACES
+    // =============================================
+
+    await client.query(`ALTER TABLE races ADD COLUMN IF NOT EXISTS sprint_qualifying_date TIMESTAMP`);
+    await client.query(`ALTER TABLE races ADD COLUMN IF NOT EXISTS sprint_date TIMESTAMP`);
+    await client.query(`ALTER TABLE races ADD COLUMN IF NOT EXISTS is_sprint_weekend BOOLEAN DEFAULT FALSE`);
+    console.log('✓ Colunas sprint garantidas em races');
+
+    // =============================================
+    // LIVE: RESULTADOS POR SESSAO
+    // =============================================
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS session_results (
+        id SERIAL PRIMARY KEY,
+        race_id INTEGER REFERENCES races(id) ON DELETE CASCADE NOT NULL,
+        session_type VARCHAR(30) NOT NULL,
+        driver_id INTEGER REFERENCES drivers(id) ON DELETE CASCADE NOT NULL,
+        position INTEGER NOT NULL,
+        best_lap_time VARCHAR(20),
+        gap VARCHAR(20),
+        tire_compound VARCHAR(20),
+        pit_stops INTEGER DEFAULT 0,
+        status VARCHAR(10),
+        updated_at TIMESTAMP DEFAULT NOW(),
+        UNIQUE(race_id, session_type, driver_id)
+      );
+    `);
+    console.log('✓ Tabela session_results criada');
+
+    // =============================================
+    // LIVE: MENSAGENS DE DIRECAO DE PROVA
+    // =============================================
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS race_control_messages (
+        id SERIAL PRIMARY KEY,
+        race_id INTEGER REFERENCES races(id) ON DELETE CASCADE NOT NULL,
+        session_type VARCHAR(30) NOT NULL,
+        message TEXT NOT NULL,
+        flag VARCHAR(20),
+        driver_number INTEGER,
+        happened_at TIMESTAMP DEFAULT NOW(),
+        created_at TIMESTAMP DEFAULT NOW()
+      );
+    `);
+    console.log('✓ Tabela race_control_messages criada');
+
     // Criar índices para melhor performance
     console.log('\nCriando índices...');
 
@@ -504,6 +558,9 @@ async function migrate() {
       'CREATE INDEX IF NOT EXISTS idx_chat_group_members_user ON chat_group_members(user_id);',
       'CREATE INDEX IF NOT EXISTS idx_message_read_receipts_message ON message_read_receipts(message_id);',
       'CREATE INDEX IF NOT EXISTS idx_message_read_receipts_user ON message_read_receipts(user_id);',
+      'CREATE INDEX IF NOT EXISTS idx_session_results_race ON session_results(race_id, session_type);',
+      'CREATE INDEX IF NOT EXISTS idx_session_results_driver ON session_results(driver_id);',
+      'CREATE INDEX IF NOT EXISTS idx_race_control_race ON race_control_messages(race_id, session_type);',
     ];
 
     for (const idx of indexes) {

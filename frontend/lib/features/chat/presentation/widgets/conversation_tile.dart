@@ -192,7 +192,7 @@ class ConversationTile extends StatelessWidget {
       return 'Nenhuma mensagem';
     }
     if (type == 'group' && lastMessageSender != null) {
-      return '${lastMessageSender}: $lastMessage';
+      return '$lastMessageSender: $lastMessage';
     }
     return lastMessage!;
   }

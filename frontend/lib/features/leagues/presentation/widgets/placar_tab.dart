@@ -24,6 +24,7 @@ class _PlacarTabState extends State<PlacarTab>
   final ApiClient _api = ApiClient();
   List<dynamic> _ranking = [];
   bool _isLoading = true;
+  Map<String, dynamic>? _liveScoring;
 
   @override
   bool get wantKeepAlive => true;
@@ -165,6 +166,33 @@ class _PlacarTabState extends State<PlacarTab>
           );
         },
       ),
+    );
+  }
+
+  Widget _buildProvisionalBadge(String usrId, int officialPts) {
+    final ranking = (_liveScoring?['ranking'] as List?) ?? [];
+    int provPts = 0;
+    for (final r in ranking) {
+      if (r['userId']?.toString() == usrId) {
+        provPts = r['provisionalPoints'] as int? ?? 0;
+        break;
+      }
+    }
+    final total = officialPts + provPts;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        Text('$total', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.primaryRed)),
+        if (provPts > 0)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+            decoration: BoxDecoration(
+              color: Colors.orange.withValues(alpha: 0.2),
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: Text('+$provPts prov.', style: const TextStyle(fontSize: 9, color: Colors.orange)),
+          ),
+      ],
     );
   }
 

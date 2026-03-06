@@ -430,7 +430,27 @@ function initSocket(httpServer, corsOrigin) {
     // DESCONEXÃO
     // ==================
 
-    socket.on('disconnect', async () => {
+    // =============================================
+    // LIVE: EVENTOS DE SESSAO AO VIVO
+    // =============================================
+
+    // Admin/usuario entra na sala da corrida para receber atualizacoes ao vivo
+    socket.on('join_race', (raceId) => {
+      if (raceId) {
+        socket.join(`race:${raceId}`);
+        logger.info(`User ${userId} joined race:${raceId}`);
+      }
+    });
+
+    // Admin/usuario sai da sala da corrida
+    socket.on('leave_race', (raceId) => {
+      if (raceId) {
+        socket.leave(`race:${raceId}`);
+        logger.info(`User ${userId} left race:${raceId}`);
+      }
+    });
+
+        socket.on('disconnect', async () => {
       onlineUsers.delete(userId);
       logger.info(`Socket desconectado: userId=${userId}`);
 
@@ -449,4 +469,9 @@ function initSocket(httpServer, corsOrigin) {
   return io;
 }
 
-module.exports = { initSocket, onlineUsers };
+// Retorna a instancia do socket.io para uso externo
+function getIo() {
+  return _io;
+}
+
+module.exports = { initSocket, onlineUsers, getIo };

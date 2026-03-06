@@ -28,6 +28,8 @@ const { systemSettings } = require('./system_settings');
 const { chatGroups } = require('./chatGroups');
 const { chatGroupMembers } = require('./chatGroupMembers');
 const { messageReadReceipts } = require('./messageReadReceipts');
+const { sessionResults } = require('./sessionResults');
+const { raceControlMessages } = require('./raceControlMessages');
 
 module.exports = {
   users,
@@ -57,4 +59,6 @@ module.exports = {
   chatGroups,
   chatGroupMembers,
   messageReadReceipts,
+  sessionResults,
+  raceControlMessages,
 };

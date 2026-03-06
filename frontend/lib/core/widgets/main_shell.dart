@@ -47,10 +47,11 @@ class _MainShellState extends State<MainShell> {
 
   int _selectedIndex(BuildContext context) {
     final loc = GoRouterState.of(context).uri.path;
-    if (loc.startsWith('/leagues')) return 1;
-    if (loc.startsWith('/rankings')) return 2;
-    if (loc.startsWith('/f1-results')) return 3;
-    if (loc.startsWith('/profile')) return 4;
+    if (loc.startsWith('/live')) return 1;
+    if (loc.startsWith('/leagues')) return 2;
+    if (loc.startsWith('/rankings')) return 3;
+    if (loc.startsWith('/f1-results')) return 4;
+    if (loc.startsWith('/profile')) return 5;
     return 0;
   }
 

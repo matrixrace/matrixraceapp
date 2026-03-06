@@ -187,6 +187,8 @@ class _AdminDriversScreenState extends State<AdminDriversScreen> {
     final firstCtrl = TextEditingController(text: driver['first_name'] ?? '');
     final lastCtrl = TextEditingController(text: driver['last_name'] ?? '');
     final numCtrl = TextEditingController(text: '${driver['number'] ?? ''}');
+    final countryCtrl = TextEditingController(text: driver['country'] ?? '');
+    final abbrevCtrl = TextEditingController(text: driver['abbreviation'] ?? '');
     String? selectedTeamId = driver['team_id']?.toString();
     bool isActive = driver['is_active'] == true;
     String? localPhotoUrl = driver['photo_url'] as String?;
@@ -334,6 +336,20 @@ class _AdminDriversScreenState extends State<AdminDriversScreen> {
                     keyboardType: TextInputType.number,
                   ),
                   const SizedBox(height: 8),
+                  TextField(
+                    controller: countryCtrl,
+                    decoration: const InputDecoration(
+                        labelText: 'País'),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: abbrevCtrl,
+                    decoration: const InputDecoration(
+                        labelText: 'Abreviação (ex: HAM)'),
+                    maxLength: 3,
+                    textCapitalization: TextCapitalization.characters,
+                  ),
+                  const SizedBox(height: 8),
                   DropdownButtonFormField<String>(
                     initialValue: selectedTeamId,
                     decoration:
@@ -390,6 +406,8 @@ class _AdminDriversScreenState extends State<AdminDriversScreen> {
                         ? int.tryParse(selectedTeamId!)
                         : null,
                     'isActive': isActive,
+                    'country': countryCtrl.text.isEmpty ? null : countryCtrl.text,
+                    'abbreviation': abbrevCtrl.text.isEmpty ? null : abbrevCtrl.text.toUpperCase(),
                   };
                   final res = await _api.put(
                       '/admin/drivers/${driver['id']}',

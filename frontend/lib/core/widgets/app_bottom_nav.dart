@@ -24,12 +24,14 @@ class AppBottomNav extends StatelessWidget {
               case 0:
                 context.go('/');
               case 1:
-                context.go('/leagues');
+                context.go('/live');
               case 2:
-                context.go('/rankings');
+                context.go('/leagues');
               case 3:
-                context.go('/f1-results');
+                context.go('/rankings');
               case 4:
+                context.go('/f1-results');
+              case 5:
                 context.go('/profile');
             }
           },
@@ -38,6 +40,11 @@ class AppBottomNav extends StatelessWidget {
               icon: Icon(Icons.home_outlined),
               selectedIcon: Icon(Icons.home),
               label: 'Início',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.live_tv_outlined),
+              selectedIcon: Icon(Icons.live_tv),
+              label: 'Live',
             ),
             NavigationDestination(
               icon: Icon(Icons.groups_outlined),
