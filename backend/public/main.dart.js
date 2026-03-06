@@ -54982,7 +54982,7 @@ return A.n(p.oX(),$async$yW)
 case 7:s=5
 break
 case 6:n=o.c
-if(t.f.b(n)&&J.c(J.x(n,"manualFallback"),!0))p.rm("OpenF1 indisponivel. Use o modo manual.",B.bk)
+if(t.f.b(n)&&J.c(J.x(n,"manualFallback"),!0))p.rm("API indisponivel. Use o modo manual.",B.bk)
 else{n=o.b
 p.rm(n,B.aI)}case 5:case 1:return A.r(q,r)}})
 return A.t($async$yW,r)},
@@ -55080,7 +55080,7 @@ l=o.at
 k=l?n:new A.aGo(o,a)
 q=l?B.G5:B.T7
 p=t.p
-k=A.b([A.i6(q,A.o(l?"Atualizando...":"Atualizar da OpenF1",n,n,n,n,n,n,n,n),k,A.i7(n,n,B.dp,n,n,n,n,n,n,n,n,n,n,n,n,n,n,n,n,n)),B.a8,A.mn(B.kh,B.adb,new A.aGp(o,a),n),B.dT],p)
+k=A.b([A.i6(q,A.o(l?"Atualizando...":"Atualizar da API",n,n,n,n,n,n,n,n),k,A.i7(n,n,B.dp,n,n,n,n,n,n,n,n,n,n,n,n,n,n,n,n,n)),B.a8,A.mn(B.kh,B.adb,new A.aGp(o,a),n),B.dT],p)
 if(r!=null)k.push(A.o("Atualizado: "+o.ak6(r),n,n,n,n,B.pP,n,n,n))
 if(a==="race"&&J.eA(s))B.b.M(k,A.b([B.G_,A.i6(B.TH,B.Hb,o.gapq(),A.i7(n,n,B.k,n,n,n,n,n,n,n,n,n,n,n,n,n,n,n,n,n))],p))
 l=A.b([A.at(n,A.ao(k,B.j,B.e,B.h,0,n),B.n,n,n,n,n,n,n,B.bH,n,n,n)],p)
@@ -55146,16 +55146,16 @@ $0(){A.c_(this.a,!1).cf(!0)
 return null},
 $S:0}
 A.aGC.prototype={
-$1(a){var s,r="firstName",q="lastName",p="abbreviation",o=B.b.k9(this.a.ax,new A.aGA(a),new A.aGB(a)),n=J.P(a),m=n.h(a,"driverId"),l=J.P(o),k=l.h(o,r)
-if(k==null)k=n.h(a,r)
-k=A.h(k==null?"":k)
-s=l.h(o,q)
-if(s==null)s=n.h(a,q)
+$1(a){var s,r="abbreviation",q=B.b.k9(this.a.ax,new A.aGA(a),new A.aGB(a)),p=J.P(a),o=p.h(a,"driverId"),n=J.P(q),m=n.h(q,"first_name")
+if(m==null)m=p.h(a,"firstName")
+m=A.h(m==null?"":m)
+s=n.h(q,"last_name")
+if(s==null)s=p.h(a,"lastName")
 s=A.h(s==null?"":s)
-l=l.h(o,p)
-n=l==null?n.h(a,p):l
-if(n==null)n="???"
-return A.a5(["driverId",m,"name",k+" "+s,"abbreviation",n],t.N,t.z)},
+n=n.h(q,r)
+p=n==null?p.h(a,r):n
+if(p==null)p="???"
+return A.a5(["driverId",o,"name",m+" "+s,"abbreviation",p],t.N,t.z)},
 $S:306}
 A.aGA.prototype={
 $1(a){return J.c(J.x(a,"id"),J.x(this.a,"driverId"))},
@@ -55164,10 +55164,10 @@ A.aGB.prototype={
 $0(){return this.a},
 $S:68}
 A.aGD.prototype={
-$1(a){return J.c(J.x(a,"isActive"),!0)},
+$1(a){return J.c(J.x(a,"is_active"),!0)},
 $S:75}
 A.aGE.prototype={
-$1(a){var s=J.P(a),r=s.h(a,"id"),q=A.h(s.h(a,"firstName")),p=A.h(s.h(a,"lastName"))
+$1(a){var s=J.P(a),r=s.h(a,"id"),q=A.h(s.h(a,"first_name")),p=A.h(s.h(a,"last_name"))
 s=s.h(a,"abbreviation")
 if(s==null)s="???"
 return A.a5(["driverId",r,"name",q+" "+p,"abbreviation",s],t.N,t.z)},

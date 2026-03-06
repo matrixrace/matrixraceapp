@@ -118,7 +118,7 @@ class _AdminLiveResultsScreenState extends State<AdminLiveResultsScreen> with Si
     } else {
       final isManualFallback = res.data is Map && res.data['manualFallback'] == true;
       if (isManualFallback) {
-        _showSnack('OpenF1 indisponivel. Use o modo manual.', Colors.orange);
+        _showSnack('API indisponivel. Use o modo manual.', Colors.orange);
       } else {
         _showSnack(res.message ?? 'Erro ao atualizar', Colors.red);
       }
@@ -166,14 +166,14 @@ class _AdminLiveResultsScreenState extends State<AdminLiveResultsScreen> with Si
         final driver = _drivers.firstWhere((d) => d['id'] == r['driverId'], orElse: () => r);
         return {
           'driverId': r['driverId'],
-          'name': '${driver['firstName'] ?? r['firstName'] ?? ''} ${driver['lastName'] ?? r['lastName'] ?? ''}',
+          'name': '${driver['first_name'] ?? r['firstName'] ?? ''} ${driver['last_name'] ?? r['lastName'] ?? ''}',
           'abbreviation': driver['abbreviation'] ?? r['abbreviation'] ?? '???',
         };
       }).toList();
     } else {
-      orderedDrivers = _drivers.where((d) => d['isActive'] == true).map((d) => {
+      orderedDrivers = _drivers.where((d) => d['is_active'] == true).map((d) => {
         'driverId': d['id'],
-        'name': '${d['firstName']} ${d['lastName']}',
+        'name': '${d['first_name']} ${d['last_name']}',
         'abbreviation': d['abbreviation'] ?? '???',
       }).toList();
     }
@@ -346,13 +346,13 @@ class _AdminLiveResultsScreenState extends State<AdminLiveResultsScreen> with Si
           padding: const EdgeInsets.all(12),
           child: Row(
             children: [
-              // Atualizar da OpenF1
+              // Atualizar da API
               ElevatedButton.icon(
                 onPressed: _refreshing ? null : () => _refreshSession(sessionType),
                 icon: _refreshing
                   ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                   : const Icon(Icons.cloud_download, size: 18),
-                label: Text(_refreshing ? 'Atualizando...' : 'Atualizar da OpenF1'),
+                label: Text(_refreshing ? 'Atualizando...' : 'Atualizar da API'),
                 style: ElevatedButton.styleFrom(backgroundColor: Colors.blue),
               ),
               const SizedBox(width: 8),
