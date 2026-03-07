@@ -87,11 +87,30 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     on<AuthGoogleLoginRequested>(_onGoogleLogin);
   }
 
-  // Verifica se já está logado
+  // Verifica se já está logado (e captura resultado de redirect do Google)
   Future<void> _onCheckAuth(
     AuthCheckRequested event,
     Emitter<AuthState> emit,
   ) async {
+    try {
+      // Verifica se está retornando de um signInWithRedirect do Google
+      final redirectResult = await _firebaseAuth.getRedirectResult();
+      if (redirectResult.user != null) {
+        final user = redirectResult.user!;
+        // Upsert no banco de dados
+        await _apiClient.post('/auth/register', body: {
+          'firebaseUid': user.uid,
+          'email': user.email ?? '',
+          'displayName': user.displayName ?? user.email?.split('@').first ?? 'Usuário',
+          'photoUrl': user.photoURL ?? '',
+        });
+        emit(AuthAuthenticated(user));
+        return;
+      }
+    } catch (_) {
+      // Ignora erros do getRedirectResult (ex: sem redirect pendente)
+    }
+
     final user = _firebaseAuth.currentUser;
     if (user != null) {
       emit(AuthAuthenticated(user));
@@ -162,7 +181,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     emit(AuthUnauthenticated());
   }
 
-  // Login com Google (popup — Flutter Web)
+  // Login com Google (redirect — Flutter Web)
   Future<void> _onGoogleLogin(
     AuthGoogleLoginRequested event,
     Emitter<AuthState> emit,
@@ -170,18 +189,11 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     emit(AuthLoading());
     try {
       final provider = GoogleAuthProvider();
-      final credential = await _firebaseAuth.signInWithPopup(provider);
-      final user = credential.user!;
-
-      // Upsert no banco de dados (cria se não existir)
-      await _apiClient.post('/auth/register', body: {
-        'firebaseUid': user.uid,
-        'email': user.email ?? '',
-        'displayName': user.displayName ?? user.email?.split('@').first ?? 'Usuário',
-        'photoUrl': user.photoURL ?? '',
-      });
-
-      emit(AuthAuthenticated(user));
+      // Usa redirect em vez de popup: evita problemas com popup bloqueado
+      // ou em branco quando o domínio personalizado não serve /_/auth/handler
+      await _firebaseAuth.signInWithRedirect(provider);
+      // O resultado é capturado em _onCheckAuth via getRedirectResult()
+      // quando o app recarrega após o redirect
     } on FirebaseAuthException catch (e) {
       emit(AuthError(_getFirebaseErrorMessage(e.code)));
     } catch (e) {
