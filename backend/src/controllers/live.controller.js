@@ -153,8 +153,8 @@ async function manualSessionResults(req, res, next) {
     const insertedResults = [];
     for (const r of results) {
       await pool.query(
-        `INSERT INTO session_results (race_id, session_type, driver_id, position, updated_at)
-         VALUES ($1, $2, $3, $4, NOW())`,
+        `INSERT INTO session_results (race_id, session_type, driver_id, position, best_lap_time, gap, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, NOW())`,
         [raceId, sessionType, r.driverId, r.position, r.bestLapTime || null, r.gap || null]
       );
       insertedResults.push({ driverId: r.driverId, position: r.position, bestLapTime: r.bestLapTime || null, gap: r.gap || null });
@@ -560,6 +560,151 @@ async function generatePositionChangeNotifications(raceId, sessionType, newResul
   }
 }
 
+// ==================
+// EXTERNAL: IMPORTAR RESULTADOS VIA API KEY
+// ==================
+
+// POST /api/v1/live/external/races/:id/sessions/:sessionType/update
+async function importSessionResults(req, res, next) {
+  try {
+    const raceId = parseInt(req.params.id);
+    const { sessionType } = req.params;
+    const { results } = req.body;
+
+    if (!VALID_SESSION_TYPES.includes(sessionType)) {
+      return next(errorResponse('Tipo de sessao invalido', 400));
+    }
+
+    const [race] = await db.select().from(races).where(eq(races.id, raceId)).limit(1);
+    if (!race) return next(errorResponse('Corrida nao encontrada', 404));
+
+    // Busca todos os drivers ativos e cria mapa abbreviation -> id
+    const allDrivers = await db.select().from(drivers).where(eq(drivers.isActive, true));
+    const abbrevMap = {};
+    for (const d of allDrivers) {
+      if (d.abbreviation) abbrevMap[d.abbreviation.toUpperCase()] = d.id;
+    }
+
+    // Busca posicoes anteriores para notificacoes
+    const previousResults = await pool.query(
+      'SELECT driver_id, position FROM session_results WHERE race_id = $1 AND session_type = $2',
+      [raceId, sessionType]
+    );
+    const prevPositions = {};
+    for (const r of previousResults.rows) {
+      prevPositions[r.driver_id] = r.position;
+    }
+
+    // Remove resultados anteriores
+    await pool.query(
+      'DELETE FROM session_results WHERE race_id = $1 AND session_type = $2',
+      [raceId, sessionType]
+    );
+
+    // Insere novos resultados
+    const insertedResults = [];
+    const skipped = [];
+    for (const r of results) {
+      const abbr = r.abbreviation.toUpperCase();
+      const driverId = abbrevMap[abbr];
+      if (!driverId) {
+        skipped.push(abbr);
+        continue;
+      }
+
+      await pool.query(
+        `INSERT INTO session_results (race_id, session_type, driver_id, position, best_lap_time, gap, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, NOW())`,
+        [raceId, sessionType, driverId, r.position, r.bestLapTime || null, r.gap || null]
+      );
+
+      insertedResults.push({
+        driverId,
+        abbreviation: abbr,
+        position: r.position,
+        bestLapTime: r.bestLapTime || null,
+        gap: r.gap || null,
+      });
+    }
+
+    // Emite atualizacao via socket
+    const io = getIo();
+    if (io) {
+      io.to(`race:${raceId}`).emit('session_results_updated', {
+        raceId,
+        sessionType,
+        results: insertedResults,
+        raceControl: [],
+        updatedAt: new Date().toISOString(),
+      });
+    }
+
+    // Gera notificacoes de mudanca de posicao
+    await generatePositionChangeNotifications(raceId, sessionType, insertedResults, prevPositions);
+
+    logger.info(`Sessao ${sessionType} importada via API key para ${race.name}: ${insertedResults.length} pilotos`);
+    res.json(successResponse({
+      inserted: insertedResults.length,
+      skipped,
+      results: insertedResults,
+    }, `Resultados importados: ${insertedResults.length} pilotos`));
+  } catch (error) {
+    next(error);
+  }
+}
+
+// GET /api/v1/live/external/drivers
+async function getExternalDrivers(req, res, next) {
+  try {
+    const result = await pool.query(
+      `SELECT d.id, d.abbreviation, d.first_name, d.last_name, d.number,
+              t.name as team_name
+       FROM drivers d
+       LEFT JOIN teams t ON t.id = d.team_id
+       WHERE d.is_active = true
+       ORDER BY d.abbreviation`
+    );
+
+    const driversList = result.rows.map(d => ({
+      id: d.id,
+      abbreviation: d.abbreviation,
+      name: `${d.first_name} ${d.last_name}`,
+      number: d.number,
+      team: d.team_name,
+    }));
+
+    res.json(successResponse(driversList));
+  } catch (error) {
+    next(error);
+  }
+}
+
+// GET /api/v1/live/external/races
+async function getExternalRaces(req, res, next) {
+  try {
+    const season = parseInt(req.query.season) || new Date().getFullYear();
+    const result = await pool.query(
+      `SELECT id, name, round, season, race_date, is_sprint_weekend, is_completed
+       FROM races WHERE season = $1 ORDER BY round`,
+      [season]
+    );
+
+    const racesList = result.rows.map(r => ({
+      id: r.id,
+      name: r.name,
+      round: r.round,
+      season: r.season,
+      raceDate: r.race_date,
+      isSprintWeekend: r.is_sprint_weekend,
+      isCompleted: r.is_completed,
+    }));
+
+    res.json(successResponse(racesList));
+  } catch (error) {
+    next(error);
+  }
+}
+
 module.exports = {
   refreshSessionFromAPI,
   manualSessionResults,
@@ -567,4 +712,7 @@ module.exports = {
   getSessionResults,
   getLiveScoring,
   getLeagueLiveScoring,
+  importSessionResults,
+  getExternalDrivers,
+  getExternalRaces,
 };

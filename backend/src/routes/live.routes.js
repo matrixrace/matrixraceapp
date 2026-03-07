@@ -6,13 +6,22 @@ const {
   getSessionResults,
   getLiveScoring,
   getLeagueLiveScoring,
+  importSessionResults,
+  getExternalDrivers,
+  getExternalRaces,
 } = require('../controllers/live.controller');
 const { authenticate } = require('../middleware/auth');
 const { requireAdmin } = require('../middleware/adminCheck');
+const { authenticateApiKey } = require('../middleware/apiKeyAuth');
 const { validate } = require('../middleware/validator');
-const { manualSessionResultsSchema } = require('../utils/validators');
+const { manualSessionResultsSchema, importSessionResultsSchema } = require('../utils/validators');
 
 const router = Router();
+
+// Rotas externas (API key) - ANTES das rotas parametrizadas
+router.get('/external/drivers', authenticateApiKey, getExternalDrivers);
+router.get('/external/races', authenticateApiKey, getExternalRaces);
+router.post('/external/races/:id/sessions/:sessionType/update', authenticateApiKey, validate(importSessionResultsSchema), importSessionResults);
 
 // Rotas publicas (autenticadas)
 router.get('/races/:id/sessions', authenticate, getSessionResults);

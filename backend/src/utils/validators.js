@@ -120,6 +120,18 @@ const manualSessionResultsSchema = z.object({
   ).min(1, 'Pelo menos 1 resultado e necessario'),
 });
 
+// --- Import Session Results (External API) ---
+const importSessionResultsSchema = z.object({
+  results: z.array(
+    z.object({
+      abbreviation: z.string().length(3, 'Abreviacao deve ter 3 letras'),
+      position: z.number().int().min(1, 'Posicao deve ser >= 1'),
+      bestLapTime: z.string().nullable().optional(),
+      gap: z.string().nullable().optional(),
+    })
+  ).min(1, 'Pelo menos 1 resultado e necessario'),
+});
+
 module.exports = {
   registerSchema,
   createTeamSchema,
@@ -136,4 +148,5 @@ module.exports = {
   updateOfficialLeagueSchema,
   inviteSchema,
   manualSessionResultsSchema,
+  importSessionResultsSchema,
 };

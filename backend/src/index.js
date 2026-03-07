@@ -73,6 +73,17 @@ const authLimiter = rateLimit({
 });
 app.use('/api/v1/auth/register', authLimiter);
 
+// Rate limiting para API externa (mais permissivo para updates frequentes)
+const externalLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000, // 1 minuto
+  max: 10,
+  message: {
+    success: false,
+    message: 'Rate limit para API externa atingido. Tente novamente em 1 minuto.',
+  },
+});
+app.use('/api/v1/live/external', externalLimiter);
+
 // ==================
 // ROTAS
 // ==================
@@ -142,6 +153,12 @@ app.get('/flutter_service_worker.js', (req, res) => {
 app.get('/index.html', (req, res) => {
   res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
   res.sendFile(path.join(publicPath, 'index.html'));
+});
+
+// Pagina de importacao de resultados (fora do Flutter)
+app.get('/import', (req, res) => {
+  res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.sendFile(path.join(__dirname, '..', 'import.html'));
 });
 
 // Serve arquivos estáticos do Flutter

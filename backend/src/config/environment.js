@@ -38,6 +38,9 @@ const config = {
 
   // Frontend URL (para CORS)
   frontendUrl: process.env.FRONTEND_URL || 'http://localhost:8080',
+
+  // API Key para integracao externa (Claude, scripts, etc.)
+  liveApiKey: process.env.LIVE_API_KEY || null,
 };
 
 module.exports = config;

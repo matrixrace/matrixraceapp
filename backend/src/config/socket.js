@@ -47,8 +47,10 @@ async function getUserByFirebaseUid(firebaseUid) {
   return user;
 }
 
+let _ioInstance = null;
+
 function initSocket(httpServer, corsOrigin) {
-  const io = new Server(httpServer, {
+  _ioInstance = new Server(httpServer, {
     cors: {
       origin: corsOrigin,
       methods: ['GET', 'POST'],
@@ -57,6 +59,7 @@ function initSocket(httpServer, corsOrigin) {
   });
 
   // Middleware de autenticação via Firebase token
+  var io = _ioInstance;
   io.use(async (socket, next) => {
     try {
       const token = socket.handshake.auth.token;
@@ -471,7 +474,7 @@ function initSocket(httpServer, corsOrigin) {
 
 // Retorna a instancia do socket.io para uso externo
 function getIo() {
-  return _io;
+  return _ioInstance;
 }
 
 module.exports = { initSocket, onlineUsers, getIo };
