@@ -70,7 +70,9 @@ class _PredictionScreenState extends State<PredictionScreen> {
 
     if (mounted) {
       setState(() {
-        if (raceRes.success) _race = raceRes.data;
+        if (raceRes.success) {
+          _race = raceRes.data;
+        }
 
         if (driversRes.success && driversRes.data != null) {
           _drivers = List.from(driversRes.data as List);
@@ -136,6 +138,7 @@ class _PredictionScreenState extends State<PredictionScreen> {
           );
         }
 
+        _adjustLockTypeForExpiredDeadlines();
         _isLoading = false;
       });
     }
@@ -321,6 +324,24 @@ class _PredictionScreenState extends State<PredictionScreen> {
       return DateTime.parse(value.toString()).toLocal();
     } catch (_) {
       return null;
+    }
+  }
+
+  bool _isExpired(dynamic dateValue) {
+    final dt = _parseDate(dateValue);
+    if (dt == null) return false;
+    return DateTime.now().isAfter(dt);
+  }
+
+  /// Garante que o lockType selecionado não seja um prazo já expirado.
+  void _adjustLockTypeForExpiredDeadlines() {
+    final fp1Expired = _isExpired(_race?['fp1Date'] ?? _race?['fp1_date']);
+    final qualiExpired = _isExpired(_race?['qualifyingDate'] ?? _race?['qualifying_date']);
+
+    if (_selectedLockType == 'fp1' && fp1Expired) {
+      _selectedLockType = qualiExpired ? 'race' : 'qualifying';
+    } else if (_selectedLockType == 'qualifying' && qualiExpired) {
+      _selectedLockType = 'race';
     }
   }
 
@@ -606,6 +627,9 @@ class _PredictionScreenState extends State<PredictionScreen> {
     final qualiDate = _formatDate(_race?['qualifyingDate'] ?? _race?['qualifying_date']);
     final raceDate = _formatDate(_race?['raceDate'] ?? _race?['race_date']);
 
+    final fp1Expired = _isExpired(_race?['fp1Date'] ?? _race?['fp1_date']);
+    final qualiExpired = _isExpired(_race?['qualifyingDate'] ?? _race?['qualifying_date']);
+
     return ListView(
       padding: const EdgeInsets.all(20),
       children: [
@@ -628,6 +652,7 @@ class _PredictionScreenState extends State<PredictionScreen> {
           description: 'Máximo de 20 pontos por piloto acertado. Mais risco, mais recompensa!',
           icon: Icons.rocket_launch,
           color: const Color(0xFFFFD700),
+          enabled: !fp1Expired,
         ),
         const SizedBox(height: 12),
         _lockTypeCard(
@@ -638,6 +663,7 @@ class _PredictionScreenState extends State<PredictionScreen> {
           description: 'Máximo de 15 pontos por piloto. Bom equilíbrio entre risco e pontuação.',
           icon: Icons.speed,
           color: const Color(0xFF64C4FF),
+          enabled: !qualiExpired,
         ),
         const SizedBox(height: 12),
         _lockTypeCard(
@@ -648,6 +674,7 @@ class _PredictionScreenState extends State<PredictionScreen> {
           description: 'Máximo de 10 pontos por piloto. Mais seguro, mas pontuação menor.',
           icon: Icons.flag,
           color: AppTheme.primaryRed,
+          enabled: true,
         ),
 
         const SizedBox(height: 20),
@@ -683,64 +710,82 @@ class _PredictionScreenState extends State<PredictionScreen> {
     required String description,
     required IconData icon,
     required Color color,
+    required bool enabled,
   }) {
     final isSelected = _selectedLockType == value;
+    final effectiveColor = enabled ? color : Colors.grey.shade600;
+
     return GestureDetector(
-      onTap: () => setState(() => _selectedLockType = value),
+      onTap: enabled ? () => setState(() => _selectedLockType = value) : null,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: isSelected ? color : Colors.grey.shade700,
+            color: isSelected ? effectiveColor : Colors.grey.shade800,
             width: isSelected ? 2.5 : 1,
           ),
-          color: isSelected ? color.withValues(alpha: 0.08) : AppTheme.cardBackground,
+          color: enabled
+              ? (isSelected ? color.withValues(alpha: 0.08) : AppTheme.cardBackground)
+              : AppTheme.cardBackground.withValues(alpha: 0.5),
         ),
         padding: const EdgeInsets.all(16),
-        child: Row(
-          children: [
-            Container(
-              width: 52,
-              height: 52,
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.15),
-                shape: BoxShape.circle,
+        child: Opacity(
+          opacity: enabled ? 1.0 : 0.45,
+          child: Row(
+            children: [
+              Container(
+                width: 52,
+                height: 52,
+                decoration: BoxDecoration(
+                  color: effectiveColor.withValues(alpha: 0.15),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(icon, color: effectiveColor, size: 26),
               ),
-              child: Icon(icon, color: color, size: 26),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-                      const Spacer(),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: color,
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Text('$points pts', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 2),
-                  Text(subtitle, style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w500)),
-                  const SizedBox(height: 4),
-                  Text(description, style: const TextStyle(color: Colors.grey, fontSize: 12)),
-                ],
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                        const Spacer(),
+                        if (!enabled)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: Colors.grey.shade800,
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: const Text('Prazo encerrado', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold, fontSize: 11)),
+                          )
+                        else
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: color,
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Text('$points pts', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    Text(subtitle, style: TextStyle(color: effectiveColor, fontSize: 12, fontWeight: FontWeight.w500)),
+                    const SizedBox(height: 4),
+                    Text(description, style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(width: 8),
-            Icon(
-              isSelected ? Icons.radio_button_checked : Icons.radio_button_unchecked,
-              color: isSelected ? color : Colors.grey,
-            ),
-          ],
+              const SizedBox(width: 8),
+              Icon(
+                isSelected ? Icons.radio_button_checked : Icons.radio_button_unchecked,
+                color: isSelected ? effectiveColor : Colors.grey.shade700,
+              ),
+            ],
+          ),
         ),
       ),
     );
