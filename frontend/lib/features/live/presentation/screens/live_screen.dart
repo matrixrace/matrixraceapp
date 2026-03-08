@@ -368,8 +368,9 @@ class _LiveScreenState extends State<LiveScreen> with SingleTickerProviderStateM
           final predicted = scoring?['predictedPosition'];
 
           Color ptsColor = Colors.grey;
-          if (pts > 15) ptsColor = Colors.green;
-          else if (pts >= 10) ptsColor = Colors.orange;
+          if (pts > 15) {
+            ptsColor = Colors.green;
+          } else if (pts >= 10) ptsColor = Colors.orange;
           else if (pts > 0) ptsColor = AppTheme.primaryRed;
 
           final teamColor = _parseColor(r['teamColor']);
