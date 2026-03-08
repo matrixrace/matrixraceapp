@@ -705,6 +705,42 @@ async function getExternalRaces(req, res, next) {
   }
 }
 
+// POST /api/v1/live/external/races/:id/finalize
+async function externalFinalizeRace(req, res, next) {
+  try {
+    const raceId = parseInt(req.params.id);
+
+    const [race] = await db.select().from(races).where(eq(races.id, raceId)).limit(1);
+    if (!race) return next(errorResponse('Corrida nao encontrada', 404));
+
+    const sessionRes = await pool.query(
+      'SELECT driver_id, position FROM session_results WHERE race_id = $1 AND session_type = $2 ORDER BY position',
+      [raceId, 'race']
+    );
+
+    if (sessionRes.rows.length === 0) {
+      return res.status(400).json({ success: false, message: 'Nenhum resultado de corrida. Importe a sessao "race" primeiro.' });
+    }
+
+    await db.delete(raceResults).where(eq(raceResults.raceId, raceId));
+
+    const values = sessionRes.rows.map((r) => ({ raceId, driverId: r.driver_id, position: r.position }));
+    await db.insert(raceResults).values(values);
+
+    await db.update(races).set({ isCompleted: true, updatedAt: new Date() }).where(eq(races.id, raceId));
+
+    const scoreResult = await calculateRaceScores(raceId);
+
+    const io = getIo();
+    if (io) io.to(`race:${raceId}`).emit('race_finalized', { raceId });
+
+    logger.info(`Corrida ${race.name} finalizada via API key`);
+    res.json(successResponse(scoreResult, `Corrida ${race.name} finalizada! Pontuacoes calculadas.`));
+  } catch (error) {
+    next(error);
+  }
+}
+
 // POST /api/v1/live/external/migrate-abbreviations
 // Migração única: atualiza abreviações dos drivers pelo nome
 async function migrateAbbreviations(req, res, next) {
@@ -770,4 +806,5 @@ module.exports = {
   migrateAbbreviations,
   getExternalDrivers,
   getExternalRaces,
+  externalFinalizeRace,
 };

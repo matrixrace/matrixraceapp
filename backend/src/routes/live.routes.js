@@ -10,6 +10,7 @@ const {
   getExternalDrivers,
   getExternalRaces,
   migrateAbbreviations,
+  externalFinalizeRace,
 } = require('../controllers/live.controller');
 const { authenticate } = require('../middleware/auth');
 const { requireAdmin } = require('../middleware/adminCheck');
@@ -24,6 +25,7 @@ router.get('/external/drivers', authenticateApiKey, getExternalDrivers);
 router.get('/external/races', authenticateApiKey, getExternalRaces);
 router.post('/external/races/:id/sessions/:sessionType/update', authenticateApiKey, validate(importSessionResultsSchema), importSessionResults);
 router.post('/external/migrate-abbreviations', authenticateApiKey, migrateAbbreviations);
+router.post('/external/races/:id/finalize', authenticateApiKey, externalFinalizeRace);
 
 // Rotas publicas (autenticadas)
 router.get('/races/:id/sessions', authenticate, getSessionResults);
