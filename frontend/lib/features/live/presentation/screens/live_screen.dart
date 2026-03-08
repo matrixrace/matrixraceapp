@@ -48,7 +48,7 @@ class _LiveScreenState extends State<LiveScreen> with SingleTickerProviderStateM
     setState(() { _loading = true; _error = null; });
 
     // Busca proxima corrida
-    final racesRes = await _api.get('/races');
+    final racesRes = await _api.get('/races/all');
     if (!mounted) return;
 
     if (!racesRes.success || racesRes.data == null) {

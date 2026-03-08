@@ -59841,7 +59841,7 @@ r6(){var s=0,r=A.v(t.H),q,p=this,o,n,m,l,k,j,i,h,g,f,e,d
 var $async$r6=A.p(function(a,b){if(a===1)return A.r(b,r)
 for(;;)switch(s){case 0:p.A(new A.aSw(p))
 s=3
-return A.n(p.d.aM(0,"/races"),$async$r6)
+return A.n(p.d.aM(0,"/races/all"),$async$r6)
 case 3:o=b
 if(p.c==null){s=1
 break}if(!o.a||o.c==null){p.A(new A.aSx(p))
