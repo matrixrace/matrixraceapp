@@ -30,6 +30,9 @@ const liveRoutes = require('./routes/live.routes');
 const app = express();
 const httpServer = http.createServer(app);
 
+// Trust proxy do Railway (necessário para rate limiters funcionarem corretamente)
+app.set('trust proxy', 1);
+
 // ==================
 // MIDDLEWARES GLOBAIS
 // ==================
