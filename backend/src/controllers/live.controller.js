@@ -705,6 +705,60 @@ async function getExternalRaces(req, res, next) {
   }
 }
 
+// POST /api/v1/live/external/migrate-abbreviations
+// Migração única: atualiza abreviações dos drivers pelo nome
+async function migrateAbbreviations(req, res, next) {
+  try {
+    const abbreviationMap = {
+      'Franco Colapinto': 'COL',
+      'Pierre Gasly': 'GAS',
+      'Fernando Alonso': 'ALO',
+      'Lance Stroll': 'STR',
+      'Gabriel Bortoleto': 'BOR',
+      'Nico Hülkenberg': 'HUL',
+      'Nico Hulkenberg': 'HUL',
+      'Valtteri Bottas': 'BOT',
+      'Sergio Pérez': 'PER',
+      'Sergio Perez': 'PER',
+      'Lewis Hamilton': 'HAM',
+      'Charles Leclerc': 'LEC',
+      'Oliver Bearman': 'BEA',
+      'Esteban Ocon': 'OCO',
+      'Lando Norris': 'NOR',
+      'Oscar Piastri': 'PIA',
+      'Andrea Kimi Antonelli': 'ANT',
+      'Kimi Antonelli': 'ANT',
+      'George Russell': 'RUS',
+      'Arvid Lindblad': 'LIN',
+      'Liam Lawson': 'LAW',
+      'Max Verstappen': 'VER',
+      'Isack Hadjar': 'HAD',
+      'Carlos Sainz': 'SAI',
+      'Alexander Albon': 'ALB',
+    };
+
+    const driversRes = await pool.query('SELECT id, first_name, last_name, abbreviation FROM drivers');
+    let updated = 0;
+    const skipped = [];
+
+    for (const d of driversRes.rows) {
+      if (d.abbreviation) continue; // já tem abreviação
+      const fullName = `${d.first_name} ${d.last_name}`;
+      const abbr = abbreviationMap[fullName];
+      if (abbr) {
+        await pool.query('UPDATE drivers SET abbreviation = $1 WHERE id = $2', [abbr, d.id]);
+        updated++;
+      } else {
+        skipped.push(fullName);
+      }
+    }
+
+    res.json(successResponse({ updated, skipped }, `${updated} drivers atualizados`));
+  } catch (error) {
+    next(error);
+  }
+}
+
 module.exports = {
   refreshSessionFromAPI,
   manualSessionResults,
@@ -713,6 +767,7 @@ module.exports = {
   getLiveScoring,
   getLeagueLiveScoring,
   importSessionResults,
+  migrateAbbreviations,
   getExternalDrivers,
   getExternalRaces,
 };

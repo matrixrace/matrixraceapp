@@ -9,6 +9,7 @@ const {
   importSessionResults,
   getExternalDrivers,
   getExternalRaces,
+  migrateAbbreviations,
 } = require('../controllers/live.controller');
 const { authenticate } = require('../middleware/auth');
 const { requireAdmin } = require('../middleware/adminCheck');
@@ -22,6 +23,7 @@ const router = Router();
 router.get('/external/drivers', authenticateApiKey, getExternalDrivers);
 router.get('/external/races', authenticateApiKey, getExternalRaces);
 router.post('/external/races/:id/sessions/:sessionType/update', authenticateApiKey, validate(importSessionResultsSchema), importSessionResults);
+router.post('/external/migrate-abbreviations', authenticateApiKey, migrateAbbreviations);
 
 // Rotas publicas (autenticadas)
 router.get('/races/:id/sessions', authenticate, getSessionResults);
