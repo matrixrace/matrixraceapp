@@ -12,12 +12,22 @@ const logger = require('../utils/logger');
 async function getMyLeagues(req, res, next) {
   try {
     const { raceId } = req.query;
+    const rawStatus = req.query.status;
+    const status = rawStatus === 'ended' ? 'ended' : rawStatus === 'all' ? 'all' : 'active';
+
+    // HAVING para filtrar status (mesma lógica de getPublicLeagues)
+    const havingClause = status === 'ended'
+      ? `HAVING COUNT(DISTINCT lr_count.race_id) FILTER (WHERE r.race_date > NOW() AND r.is_completed = false) = 0
+              AND COUNT(DISTINCT lr_count.race_id) > 0`
+      : status === 'all'
+      ? ``
+      : `HAVING COUNT(DISTINCT lr_count.race_id) FILTER (WHERE r.race_date > NOW() AND r.is_completed = false) > 0
+              OR COUNT(DISTINCT lr_count.race_id) = 0`;
 
     let query;
     let params;
 
     if (raceId) {
-      // Retorna apenas ligas que o usuário é membro E que contêm essa corrida
       query = `SELECT l.*,
         COUNT(DISTINCT lm2.user_id) as member_count,
         COUNT(DISTINCT lr_count.race_id) as race_count,
@@ -34,6 +44,7 @@ async function getMyLeagues(req, res, next) {
        LEFT JOIN races r ON r.id = lr_count.race_id
        WHERE lm.user_id = $1 AND lm.status = 'active'
        GROUP BY l.id
+       ${havingClause}
        ORDER BY l.created_at DESC`;
       params = [req.user.id, parseInt(raceId)];
     } else {
@@ -52,6 +63,7 @@ async function getMyLeagues(req, res, next) {
        LEFT JOIN races r ON r.id = lr_count.race_id
        WHERE lm.user_id = $1 AND lm.status = 'active'
        GROUP BY l.id
+       ${havingClause}
        ORDER BY l.created_at DESC`;
       params = [req.user.id];
     }

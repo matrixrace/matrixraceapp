@@ -52,23 +52,18 @@ class _LeaguesScreenState extends State<LeaguesScreen> {
     List<dynamic> result = [];
 
     if (_membershipFilter == 'mine') {
-      // Apenas minhas ligas
-      final raceQuery = _selectedRaceId != null ? '?raceId=$_selectedRaceId' : '';
-      final res = await _api.get('/leagues$raceQuery');
+      // Apenas minhas ligas (backend filtra por status)
+      final params = <String>[];
+      if (_selectedRaceId != null) params.add('raceId=$_selectedRaceId');
+      params.add('status=$_statusFilter');
+      final queryStr = params.isNotEmpty ? '?${params.join('&')}' : '';
+      final res = await _api.get('/leagues$queryStr');
       if (res.success && res.data != null) {
         result = (res.data as List).map((item) {
           final map = Map<String, dynamic>.from(item as Map);
           map['user_member_status'] = 'active';
           return map;
         }).toList();
-        // Filtro de status no frontend para "minhas ligas"
-        if (_statusFilter != 'all') {
-          result = result.where((l) {
-            final futureCount = int.tryParse(l['future_race_count']?.toString() ?? '0') ?? 0;
-            if (_statusFilter == 'active') return futureCount > 0;
-            return futureCount == 0;
-          }).toList();
-        }
       }
     } else if (_membershipFilter == 'others') {
       // Ligas públicas excluindo as minhas
@@ -86,10 +81,15 @@ class _LeaguesScreenState extends State<LeaguesScreen> {
         result = pubList.where((l) => !myIds.contains(l['id'])).toList();
       }
     } else {
-      // Todas: minhas + públicas combinadas
+      // Todas: minhas + públicas combinadas (backend filtra status em ambos)
+      final myParams = <String>[];
+      if (_selectedRaceId != null) myParams.add('raceId=$_selectedRaceId');
+      myParams.add('status=$_statusFilter');
+      final myQueryStr = myParams.isNotEmpty ? '?${myParams.join('&')}' : '';
+
       final futures = await Future.wait([
-        _api.get('/leagues${_selectedRaceId != null ? '?raceId=$_selectedRaceId' : ''}'),
-        _api.get('/leagues/public?$statusParam$raceParam'),
+        _api.get('/leagues$myQueryStr'),
+        _api.get('/leagues/public?status=$_statusFilter$raceParam'),
       ]);
       final myRes = futures[0];
       final pubRes = futures[1];
@@ -100,12 +100,6 @@ class _LeaguesScreenState extends State<LeaguesScreen> {
         for (final item in myRes.data as List) {
           final map = Map<String, dynamic>.from(item as Map);
           map['user_member_status'] = 'active';
-          // Aplica filtro de status nas minhas ligas também
-          if (_statusFilter != 'all') {
-            final futureCount = int.tryParse(map['future_race_count']?.toString() ?? '0') ?? 0;
-            if (_statusFilter == 'active' && futureCount == 0) continue;
-            if (_statusFilter == 'ended' && futureCount > 0) continue;
-          }
           combined[map['id'].toString()] = map;
         }
       }
