@@ -133,6 +133,55 @@ async function getLeagueRanking(leagueId) {
   }));
 }
 
+// Ranking global (pontuação por GP, deduplicada entre ligas)
+async function getGlobalRanking({ month, preset, startDate, endDate } = {}) {
+  let dateClause = '';
+  const params = [];
+
+  if (startDate && endDate) {
+    params.push(startDate, endDate);
+    dateClause = `AND r.race_date >= $${params.length - 1} AND r.race_date <= $${params.length}`;
+  } else if (preset && ['30d', '60d', '90d'].includes(preset)) {
+    const days = parseInt(preset);
+    dateClause = `AND r.race_date >= NOW() - INTERVAL '${days} days'`;
+  } else if (month && /^\d{4}-\d{2}$/.test(month)) {
+    params.push(`${month}-01`);
+    dateClause = `AND DATE_TRUNC('month', r.race_date) = DATE_TRUNC('month', $${params.length}::date)`;
+  } else {
+    dateClause = `AND DATE_TRUNC('month', r.race_date) = DATE_TRUNC('month', NOW())`;
+  }
+
+  const result = await pool.query(
+    `SELECT
+      u.id,
+      u.display_name,
+      u.avatar_url,
+      COALESCE(SUM(deduped.max_points), 0) AS total_points,
+      COUNT(DISTINCT deduped.race_id) AS races_played
+    FROM (
+      SELECT s.user_id, s.race_id, MAX(s.points) AS max_points
+      FROM scores s
+      JOIN races r ON r.id = s.race_id
+      WHERE r.is_completed = true ${dateClause}
+      GROUP BY s.user_id, s.race_id
+    ) deduped
+    JOIN users u ON u.id = deduped.user_id
+    WHERE u.is_admin = false
+    GROUP BY u.id, u.display_name, u.avatar_url
+    ORDER BY total_points DESC`,
+    params
+  );
+
+  return result.rows.map((row, index) => ({
+    position: index + 1,
+    userId: row.id,
+    displayName: row.display_name || 'Anônimo',
+    avatarUrl: row.avatar_url,
+    totalPoints: parseInt(row.total_points, 10),
+    racesPlayed: parseInt(row.races_played, 10),
+  }));
+}
+
 // Ranking de uma corrida específica dentro de uma liga
 async function getRaceRanking(leagueId, raceId) {
   const result = await pool.query(
@@ -173,6 +222,7 @@ async function getRaceRanking(leagueId, raceId) {
 module.exports = {
   calculatePoints,
   calculateRaceScores,
+  getGlobalRanking,
   getLeagueRanking,
   getRaceRanking,
 };

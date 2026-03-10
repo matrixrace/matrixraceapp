@@ -1,5 +1,17 @@
-const { getLeagueRanking, getRaceRanking } = require('../services/scoring.service');
+const { getGlobalRanking, getLeagueRanking, getRaceRanking } = require('../services/scoring.service');
 const { successResponse } = require('../utils/helpers');
+
+// GET /api/v1/rankings/global
+// Ranking global por GP (deduplicado entre ligas)
+async function globalRanking(req, res, next) {
+  try {
+    const { month, preset, startDate, endDate } = req.query;
+    const ranking = await getGlobalRanking({ month, preset, startDate, endDate });
+    res.json(successResponse(ranking));
+  } catch (error) {
+    next(error);
+  }
+}
 
 // GET /api/v1/rankings/league/:leagueId
 // Ranking geral de uma liga (soma de todas as corridas)
@@ -25,4 +37,4 @@ async function raceRanking(req, res, next) {
   }
 }
 
-module.exports = { leagueRanking, raceRanking };
+module.exports = { globalRanking, leagueRanking, raceRanking };
