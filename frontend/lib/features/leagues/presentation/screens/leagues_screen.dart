@@ -65,7 +65,7 @@ class _LeaguesScreenState extends State<LeaguesScreen> {
         if (_statusFilter != 'all') {
           result = result.where((l) {
             final futureCount = int.tryParse(l['future_race_count']?.toString() ?? '0') ?? 0;
-            if (_statusFilter == 'active') return futureCount > 0 || l['future_race_count'] == null;
+            if (_statusFilter == 'active') return futureCount > 0;
             return futureCount == 0;
           }).toList();
         }

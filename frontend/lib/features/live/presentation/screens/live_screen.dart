@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/services/socket_service.dart';
@@ -187,6 +188,21 @@ class _LiveScreenState extends State<LiveScreen> with SingleTickerProviderStateM
       children: [
         // Header com info da corrida e pontuacao provisoria
         _buildHeader(),
+        // Botao Resultados Anteriores
+        Container(
+          width: double.infinity,
+          color: AppTheme.cardBackground,
+          padding: const EdgeInsets.only(left: 16, right: 16, bottom: 12),
+          child: OutlinedButton.icon(
+            onPressed: () => context.go('/f1-results'),
+            icon: const Icon(Icons.history, size: 16),
+            label: const Text('Resultados Anteriores', style: TextStyle(fontSize: 13)),
+            style: OutlinedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              side: BorderSide(color: AppTheme.textSecondary.withValues(alpha: 0.3)),
+            ),
+          ),
+        ),
         // Tabs de sessoes
         if (_tabController != null)
           Container(

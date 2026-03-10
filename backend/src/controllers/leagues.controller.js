@@ -21,6 +21,7 @@ async function getMyLeagues(req, res, next) {
       query = `SELECT l.*,
         COUNT(DISTINCT lm2.user_id) as member_count,
         COUNT(DISTINCT lr_count.race_id) as race_count,
+        COUNT(DISTINCT lr_count.race_id) FILTER (WHERE r.race_date > NOW() AND r.is_completed = false) as future_race_count,
         (SELECT COALESCE(SUM(s.points), 0) FROM scores s
          WHERE s.league_id = l.id AND s.user_id = $1) as my_points
        FROM league_members lm
@@ -30,6 +31,7 @@ async function getMyLeagues(req, res, next) {
          AND lm2.user_id NOT IN (SELECT id FROM users WHERE is_admin = true)
          AND lm2.status = 'active'
        LEFT JOIN league_races lr_count ON lr_count.league_id = l.id
+       LEFT JOIN races r ON r.id = lr_count.race_id
        WHERE lm.user_id = $1 AND lm.status = 'active'
        GROUP BY l.id
        ORDER BY l.created_at DESC`;
@@ -38,6 +40,7 @@ async function getMyLeagues(req, res, next) {
       query = `SELECT l.*,
         COUNT(DISTINCT lm2.user_id) as member_count,
         COUNT(DISTINCT lr_count.race_id) as race_count,
+        COUNT(DISTINCT lr_count.race_id) FILTER (WHERE r.race_date > NOW() AND r.is_completed = false) as future_race_count,
         (SELECT COALESCE(SUM(s.points), 0) FROM scores s
          WHERE s.league_id = l.id AND s.user_id = $1) as my_points
        FROM league_members lm
@@ -46,6 +49,7 @@ async function getMyLeagues(req, res, next) {
          AND lm2.user_id NOT IN (SELECT id FROM users WHERE is_admin = true)
          AND lm2.status = 'active'
        LEFT JOIN league_races lr_count ON lr_count.league_id = l.id
+       LEFT JOIN races r ON r.id = lr_count.race_id
        WHERE lm.user_id = $1 AND lm.status = 'active'
        GROUP BY l.id
        ORDER BY l.created_at DESC`;
