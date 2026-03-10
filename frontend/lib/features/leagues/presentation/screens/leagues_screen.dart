@@ -100,6 +100,12 @@ class _LeaguesScreenState extends State<LeaguesScreen> {
         for (final item in myRes.data as List) {
           final map = Map<String, dynamic>.from(item as Map);
           map['user_member_status'] = 'active';
+          // Aplica filtro de status nas minhas ligas também
+          if (_statusFilter != 'all') {
+            final futureCount = int.tryParse(map['future_race_count']?.toString() ?? '0') ?? 0;
+            if (_statusFilter == 'active' && futureCount == 0) continue;
+            if (_statusFilter == 'ended' && futureCount > 0) continue;
+          }
           combined[map['id'].toString()] = map;
         }
       }
