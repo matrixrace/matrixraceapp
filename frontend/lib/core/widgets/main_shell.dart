@@ -156,7 +156,9 @@ class _MainShellState extends State<MainShell> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return Stack(
+      children: [
+        Scaffold(
       appBar: AppBar(
         title: ClipRRect(
           borderRadius: BorderRadius.circular(10),
@@ -284,16 +286,14 @@ class _MainShellState extends State<MainShell> {
           ),
         ],
       ),
-      body: Stack(
-        children: [
-          widget.child,
-          const TutorialOverlay(),
-        ],
-      ),
+      body: widget.child,
       bottomNavigationBar: AppBottomNav(
         key: TutorialKeys.bottomNav,
         selectedIndex: _selectedIndex(context),
       ),
+    ),
+        const TutorialOverlay(),
+      ],
     );
   }
 }

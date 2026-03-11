@@ -55155,9 +55155,9 @@ return 0},
 D(a){var s=this,r=null,q=A.aiY(A.aV(10),A.bf6("assets/images/logo_banner.png",r,B.uF,76),B.bK),p=A.cl(r,r,r,B.a2a,r,$.bng(),new A.aUL(a),r,r,r,"Como Funciona",r),o=$.bni(),n=t.p,m=A.b([A.cl(r,r,r,B.a0B,r,r,new A.aUM(s,a),r,r,r,r,r)],n),l=s.e
 if(l>0)m.push(A.lz(r,A.ln(A.ar(r,A.o(l>9?"9+":""+l,r,r,r,r,r,B.apb,B.aX,r,r),B.m,r,B.SC,B.ou,r,r,r,r,B.Zy,r,r,r),!0,r),r,r,r,6,6,r))
 q=A.jr(A.b([p,new A.dG(B.bP,r,B.bi,B.m,m,o),A.uH(new A.aUN(s),t.tj,t.FB)],n),r,r,r,r,r,r,r,q)
-n=A.b([s.a.c,B.ay0],n)
-p=$.bnj()
-return A.ff(q,r,new A.dG(B.bP,r,B.bi,B.q,n,r),new A.FQ(s.aDQ(a),p),r)}}
+p=s.a.c
+o=$.bnj()
+return new A.dG(B.bP,r,B.bi,B.q,A.b([A.ff(q,r,p,new A.FQ(s.aDQ(a),o),r),B.ay0],n),r)}}
 A.aUC.prototype={
 $0(){return this.a.e=this.b},
 $S:0}
