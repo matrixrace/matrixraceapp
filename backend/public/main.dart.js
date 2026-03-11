@@ -61027,10 +61027,13 @@ s=p.h(q,1)
 if(s.a&&s.c!=null)r.a.cx=J.eF(t.j.a(s.c))},
 $S:0}
 A.aXq.prototype={
-$1(a){var s,r=J.P(a),q=r.h(a,"race_date")
+$1(a){var s,r=J.P(a),q=r.h(a,"raceDate")
+if(q==null)q=r.h(a,"race_date")
 q=A.hO(q==null?"":q)
 s=q==null?null:A.aQ(q)
-return s===this.a&&J.c(r.h(a,"is_completed"),!0)},
+if(s===this.a)r=J.c(r.h(a,"isCompleted"),!0)||J.c(r.h(a,"is_completed"),!0)
+else r=!1
+return r},
 $S:23}
 A.aX0.prototype={
 $0(){return this.a.ay=!0},

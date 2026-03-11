@@ -155,8 +155,8 @@ class _PredictionScreenState extends State<PredictionScreen> {
         if (allRacesRes.success && allRacesRes.data != null) {
           final races = allRacesRes.data as List;
           _hasCompletedRacesThisYear = races.any((r) {
-            final year = DateTime.tryParse(r['race_date'] ?? '')?.year;
-            return year == thisYear && r['is_completed'] == true;
+            final year = DateTime.tryParse(r['raceDate'] ?? r['race_date'] ?? '')?.year;
+            return year == thisYear && (r['isCompleted'] == true || r['is_completed'] == true);
           });
         }
         final aiRes = extras[1];
