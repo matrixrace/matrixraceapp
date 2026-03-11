@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/widgets/podium_badges.dart';
 
 /// Tela de perfil público de outro usuário.
 /// Mostra status de amizade e permite solicitar/aceitar/cancelar amizade.
@@ -169,11 +170,21 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: Column(
               children: [
-                Text(
-                  name,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                      fontSize: 22, fontWeight: FontWeight.bold),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      name,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                          fontSize: 22, fontWeight: FontWeight.bold),
+                    ),
+                    PodiumBadges.fromMap(
+                      profile['podiumStats'] as Map<String, dynamic>?,
+                      fontSize: 15,
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 16),
 

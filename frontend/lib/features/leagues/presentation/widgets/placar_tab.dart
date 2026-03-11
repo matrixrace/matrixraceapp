@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../../core/network/api_client.dart';
 import '../../../../../core/theme/app_theme.dart';
+import '../../../../../core/widgets/podium_badges.dart';
 
 /// Aba Placar da área da liga
 /// Exibe ranking completo com medalhas, destacando o usuário atual
@@ -143,14 +144,25 @@ class _PlacarTabState extends State<PlacarTab>
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        name.toString(),
-                        style: TextStyle(
-                          fontWeight: isMe
-                              ? FontWeight.bold
-                              : FontWeight.normal,
-                          fontSize: 14,
-                        ),
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              name.toString(),
+                              style: TextStyle(
+                                fontWeight: isMe
+                                    ? FontWeight.bold
+                                    : FontWeight.normal,
+                                fontSize: 14,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          PodiumBadges.fromMap(
+                            entry['podiumStats'] as Map<String, dynamic>?,
+                            fontSize: 11,
+                          ),
+                        ],
                       ),
                       Text(
                         _formatJoinedAt(joinedAt),

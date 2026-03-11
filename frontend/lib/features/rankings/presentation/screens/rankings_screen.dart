@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/widgets/podium_badges.dart';
 import '../../../../core/tutorial/tutorial_bloc.dart';
 import '../../../../core/tutorial/tutorial_step.dart';
 
@@ -319,10 +320,21 @@ class _RankingsScreenState extends State<RankingsScreen> {
                                     crossAxisAlignment:
                                         CrossAxisAlignment.start,
                                     children: [
-                                      Text(name.toString(),
-                                          style: const TextStyle(
-                                              fontWeight: FontWeight.w600,
-                                              fontSize: 14)),
+                                      Row(
+                                        children: [
+                                          Flexible(
+                                            child: Text(name.toString(),
+                                                style: const TextStyle(
+                                                    fontWeight: FontWeight.w600,
+                                                    fontSize: 14),
+                                                overflow: TextOverflow.ellipsis),
+                                          ),
+                                          PodiumBadges.fromMap(
+                                            entry['podiumStats'] as Map<String, dynamic>?,
+                                            fontSize: 11,
+                                          ),
+                                        ],
+                                      ),
                                       Text(
                                         '$races ${races == 1 ? 'corrida' : 'corridas'}',
                                         style: const TextStyle(

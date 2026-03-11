@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/widgets/podium_badges.dart';
 import '../../../../core/tutorial/tutorial_bloc.dart';
 import '../../../../core/tutorial/tutorial_step.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
@@ -90,7 +91,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   : null,
             ),
             const SizedBox(height: 12),
-            Text(displayName, style: Theme.of(context).textTheme.titleLarge),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(displayName, style: Theme.of(context).textTheme.titleLarge),
+                PodiumBadges.fromMap(
+                  _profileData?['podiumStats'] as Map<String, dynamic>?,
+                  fontSize: 14,
+                ),
+              ],
+            ),
             if (email != null) ...[
               const SizedBox(height: 4),
               Text(email, style: const TextStyle(color: AppTheme.textSecondary, fontSize: 13)),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../../../core/network/api_client.dart';
 import '../../../../../core/theme/app_theme.dart';
+import '../../../../../core/widgets/podium_badges.dart';
 import 'poll_widget.dart';
 
 /// Card de post do mural da liga
@@ -187,9 +188,16 @@ class _LeaguePostCardState extends State<LeaguePostCard> {
                     children: [
                       Row(
                         children: [
-                          Text(authorName,
-                              style: const TextStyle(
-                                  fontWeight: FontWeight.w600, fontSize: 13)),
+                          Flexible(
+                            child: Text(authorName,
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.w600, fontSize: 13),
+                                overflow: TextOverflow.ellipsis),
+                          ),
+                          PodiumBadges.fromMap(
+                            _post['podium_stats'] as Map<String, dynamic>?,
+                            fontSize: 10,
+                          ),
                           if (isPinned) ...[
                             const SizedBox(width: 6),
                             const Icon(Icons.push_pin,
@@ -356,9 +364,20 @@ class _LeaguePostCardState extends State<LeaguePostCard> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(name,
-                      style: const TextStyle(
-                          fontWeight: FontWeight.w600, fontSize: 12)),
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(name,
+                            style: const TextStyle(
+                                fontWeight: FontWeight.w600, fontSize: 12),
+                            overflow: TextOverflow.ellipsis),
+                      ),
+                      PodiumBadges.fromMap(
+                        comment['podium_stats'] as Map<String, dynamic>?,
+                        fontSize: 9,
+                      ),
+                    ],
+                  ),
                   const SizedBox(height: 2),
                   Text(content,
                       style: const TextStyle(fontSize: 13, height: 1.4)),

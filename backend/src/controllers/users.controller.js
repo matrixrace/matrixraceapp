@@ -2,6 +2,7 @@ const { db } = require('../config/database');
 const { users, friendships, leagues, leagueMembers, scores } = require('../db/schema');
 const { eq, ilike, ne, and, or } = require('drizzle-orm');
 const { successResponse, errorResponse } = require('../utils/helpers');
+const { getPodiumStats } = require('../services/scoring.service');
 
 // GET /api/v1/users/search?q=
 // Busca usuários por nome ou email (exclui o próprio usuário)
@@ -137,6 +138,10 @@ async function getUserProfile(req, res, next) {
         totalLeagues: userLeagues.length,
       };
     }
+
+    // Podium stats (visível para todos)
+    const podium = await getPodiumStats([id]);
+    profile.podiumStats = podium[id] || { gold: 0, silver: 0, bronze: 0 };
 
     res.json(successResponse(profile));
   } catch (error) {

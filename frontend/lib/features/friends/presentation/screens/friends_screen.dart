@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/widgets/podium_badges.dart';
 
 /// Tela de Amigos
 /// Três abas: Amigos | Pedidos recebidos | Buscar pessoas
@@ -67,6 +68,7 @@ class _FriendListTabState extends State<_FriendListTab>
     with AutomaticKeepAliveClientMixin {
   final ApiClient _api = ApiClient();
   List<dynamic> _friends = [];
+  Map<String, dynamic> _podiumStats = {};
   bool _isLoading = true;
 
   @override
@@ -81,10 +83,21 @@ class _FriendListTabState extends State<_FriendListTab>
   Future<void> _loadFriends() async {
     final res = await _api.get('/friends');
     if (mounted) {
+      final list = res.success && res.data != null ? res.data as List : [];
       setState(() {
-        _friends = res.success && res.data != null ? res.data as List : [];
+        _friends = list;
         _isLoading = false;
       });
+      _loadPodiumStats(list);
+    }
+  }
+
+  Future<void> _loadPodiumStats(List<dynamic> friends) async {
+    final ids = friends.map((f) => f['id'] as String).toList();
+    if (ids.isEmpty) return;
+    final res = await _api.post('/rankings/podium-stats', body: {'userIds': ids});
+    if (mounted && res.success && res.data != null) {
+      setState(() => _podiumStats = res.data as Map<String, dynamic>);
     }
   }
 
@@ -150,7 +163,15 @@ class _FriendListTabState extends State<_FriendListTab>
                       style: const TextStyle(color: AppTheme.primaryRed, fontWeight: FontWeight.bold))
                   : null,
             ),
-            title: Text(name, style: const TextStyle(fontWeight: FontWeight.w600)),
+            title: Row(
+              children: [
+                Flexible(child: Text(name, style: const TextStyle(fontWeight: FontWeight.w600), overflow: TextOverflow.ellipsis)),
+                PodiumBadges.fromMap(
+                  _podiumStats[friendId] as Map<String, dynamic>?,
+                  fontSize: 11,
+                ),
+              ],
+            ),
             trailing: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -186,6 +207,7 @@ class _FriendRequestsTabState extends State<_FriendRequestsTab>
     with AutomaticKeepAliveClientMixin {
   final ApiClient _api = ApiClient();
   List<dynamic> _requests = [];
+  Map<String, dynamic> _podiumStats = {};
   bool _isLoading = true;
 
   @override
@@ -200,10 +222,17 @@ class _FriendRequestsTabState extends State<_FriendRequestsTab>
   Future<void> _loadRequests() async {
     final res = await _api.get('/friends/requests');
     if (mounted) {
+      final list = res.success && res.data != null ? res.data as List : [];
       setState(() {
-        _requests = res.success && res.data != null ? res.data as List : [];
+        _requests = list;
         _isLoading = false;
       });
+      final ids = list.map((r) => (r['user'] as Map<String, dynamic>)['id'] as String).toList();
+      if (ids.isEmpty) return;
+      final podRes = await _api.post('/rankings/podium-stats', body: {'userIds': ids});
+      if (mounted && podRes.success && podRes.data != null) {
+        setState(() => _podiumStats = podRes.data as Map<String, dynamic>);
+      }
     }
   }
 
@@ -259,7 +288,15 @@ class _FriendRequestsTabState extends State<_FriendRequestsTab>
                       style: const TextStyle(color: AppTheme.primaryRed, fontWeight: FontWeight.bold))
                   : null,
             ),
-            title: Text(name, style: const TextStyle(fontWeight: FontWeight.w600)),
+            title: Row(
+              children: [
+                Flexible(child: Text(name, style: const TextStyle(fontWeight: FontWeight.w600), overflow: TextOverflow.ellipsis)),
+                PodiumBadges.fromMap(
+                  _podiumStats[user['id']] as Map<String, dynamic>?,
+                  fontSize: 11,
+                ),
+              ],
+            ),
             subtitle: const Text('quer ser seu amigo', style: TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
             trailing: Row(
               mainAxisSize: MainAxisSize.min,
@@ -297,6 +334,7 @@ class _SearchUsersTabState extends State<_SearchUsersTab>
   final ApiClient _api = ApiClient();
   final _searchController = TextEditingController();
   List<dynamic> _results = [];
+  Map<String, dynamic> _podiumStats = {};
   bool _isSearching = false;
   final Set<String> _pendingRequests = {}; // IDs de quem já enviou pedido
 
@@ -311,16 +349,23 @@ class _SearchUsersTabState extends State<_SearchUsersTab>
 
   Future<void> _search(String query) async {
     if (query.trim().length < 2) {
-      setState(() => _results = []);
+      setState(() { _results = []; _podiumStats = {}; });
       return;
     }
     setState(() => _isSearching = true);
     final res = await _api.get('/users/search?q=${Uri.encodeComponent(query.trim())}');
     if (mounted) {
+      final list = res.success && res.data != null ? res.data as List : [];
       setState(() {
-        _results = res.success && res.data != null ? res.data as List : [];
+        _results = list;
         _isSearching = false;
       });
+      final ids = list.map((u) => u['id'] as String).toList();
+      if (ids.isEmpty) return;
+      final podRes = await _api.post('/rankings/podium-stats', body: {'userIds': ids});
+      if (mounted && podRes.success && podRes.data != null) {
+        setState(() => _podiumStats = podRes.data as Map<String, dynamic>);
+      }
     }
   }
 
@@ -398,7 +443,15 @@ class _SearchUsersTabState extends State<_SearchUsersTab>
                                       style: const TextStyle(color: AppTheme.primaryRed, fontWeight: FontWeight.bold))
                                   : null,
                             ),
-                            title: Text(name, style: const TextStyle(fontWeight: FontWeight.w600)),
+                            title: Row(
+                              children: [
+                                Flexible(child: Text(name, style: const TextStyle(fontWeight: FontWeight.w600), overflow: TextOverflow.ellipsis)),
+                                PodiumBadges.fromMap(
+                                  _podiumStats[userId] as Map<String, dynamic>?,
+                                  fontSize: 11,
+                                ),
+                              ],
+                            ),
                             trailing: alreadySent
                                 ? const Chip(
                                     label: Text('Enviado', style: TextStyle(fontSize: 12)),

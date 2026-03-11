@@ -4,6 +4,7 @@ const { eq } = require('drizzle-orm');
 const { successResponse, errorResponse } = require('../utils/helpers');
 const { sendWelcomeEmail } = require('../services/email.service');
 const { uploadImage } = require('../services/storage.service');
+const { getPodiumStats } = require('../services/scoring.service');
 const logger = require('../utils/logger');
 
 // POST /api/v1/auth/register
@@ -78,8 +79,17 @@ async function uploadAvatar(req, res, next) {
 
 // GET /api/v1/auth/me
 // Retorna os dados do usuário logado
-async function getMe(req, res) {
-  res.json(successResponse(req.user));
+async function getMe(req, res, next) {
+  try {
+    const podium = await getPodiumStats([req.user.id]);
+    const data = {
+      ...req.user,
+      podiumStats: podium[req.user.id] || { gold: 0, silver: 0, bronze: 0 },
+    };
+    res.json(successResponse(data));
+  } catch (error) {
+    next(error);
+  }
 }
 
 // PUT /api/v1/auth/me

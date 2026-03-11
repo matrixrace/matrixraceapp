@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../../core/network/api_client.dart';
 import '../../../../../core/theme/app_theme.dart';
+import '../../../../../core/widgets/podium_badges.dart';
 import 'league_post_card.dart';
 
 /// Aba Mural da área da liga
@@ -597,9 +598,18 @@ class _BestRaceCard extends StatelessWidget {
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              Text(name,
-                  style: const TextStyle(
-                      fontWeight: FontWeight.bold, fontSize: 13)),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(name,
+                      style: const TextStyle(
+                          fontWeight: FontWeight.bold, fontSize: 13)),
+                  PodiumBadges.fromMap(
+                    best['podium_stats'] as Map<String, dynamic>?,
+                    fontSize: 11,
+                  ),
+                ],
+              ),
               Text('$points pts',
                   style: const TextStyle(
                       color: AppTheme.primaryRed,

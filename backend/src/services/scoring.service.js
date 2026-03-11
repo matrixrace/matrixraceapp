@@ -94,6 +94,9 @@ async function calculateRaceScores(raceId) {
     totalLeaguesProcessed++;
   }
 
+  // Invalida cache de pódio (posições podem ter mudado)
+  invalidatePodiumCache();
+
   logger.info(
     `Pontuações calculadas: ${totalUsersProcessed} usuários em ${totalLeaguesProcessed} ligas`
   );
@@ -221,10 +224,86 @@ async function getRaceRanking(leagueId, raceId) {
   }));
 }
 
+// ── Cache de pódio ──────────────────────────────────────────────────────
+let _podiumCache = null;   // { data: Map<userId, {gold,silver,bronze}>, ts: number }
+const PODIUM_TTL = 5 * 60 * 1000; // 5 minutos
+
+function invalidatePodiumCache() {
+  _podiumCache = null;
+}
+
+/**
+ * Retorna estatísticas de pódio (1º, 2º, 3º) em ligas encerradas.
+ * @param {string[]} [userIds] – filtrar por esses IDs (opcional)
+ * @returns {Promise<Record<string, {gold:number, silver:number, bronze:number}>>}
+ */
+async function getPodiumStats(userIds) {
+  // Se cache válido, usa ele
+  if (_podiumCache && Date.now() - _podiumCache.ts < PODIUM_TTL) {
+    return _filterPodium(_podiumCache.data, userIds);
+  }
+
+  const result = await pool.query(`
+    WITH ended_leagues AS (
+      SELECT lr.league_id
+      FROM league_races lr
+      JOIN races r ON r.id = lr.race_id
+      GROUP BY lr.league_id
+      HAVING COUNT(*) > 0
+        AND COUNT(*) FILTER (WHERE r.is_completed = false OR r.race_date > NOW()) = 0
+    ),
+    league_rankings AS (
+      SELECT
+        lm.league_id,
+        lm.user_id,
+        ROW_NUMBER() OVER (
+          PARTITION BY lm.league_id
+          ORDER BY COALESCE(SUM(s.points), 0) DESC, lm.joined_at ASC
+        ) AS position
+      FROM ended_leagues el
+      JOIN league_members lm ON lm.league_id = el.league_id AND lm.status = 'active'
+      JOIN users u ON u.id = lm.user_id AND u.is_admin = false
+      LEFT JOIN scores s ON s.user_id = lm.user_id AND s.league_id = lm.league_id
+      GROUP BY lm.league_id, lm.user_id, lm.joined_at
+    )
+    SELECT
+      user_id,
+      COUNT(*) FILTER (WHERE position = 1)::int AS gold,
+      COUNT(*) FILTER (WHERE position = 2)::int AS silver,
+      COUNT(*) FILTER (WHERE position = 3)::int AS bronze
+    FROM league_rankings
+    WHERE position <= 3
+    GROUP BY user_id
+  `);
+
+  const map = {};
+  for (const row of result.rows) {
+    map[row.user_id] = {
+      gold: row.gold,
+      silver: row.silver,
+      bronze: row.bronze,
+    };
+  }
+
+  _podiumCache = { data: map, ts: Date.now() };
+  return _filterPodium(map, userIds);
+}
+
+function _filterPodium(map, userIds) {
+  if (!userIds || userIds.length === 0) return map;
+  const filtered = {};
+  for (const id of userIds) {
+    if (map[id]) filtered[id] = map[id];
+  }
+  return filtered;
+}
+
 module.exports = {
   calculatePoints,
   calculateRaceScores,
   getGlobalRanking,
   getLeagueRanking,
+  getPodiumStats,
   getRaceRanking,
+  invalidatePodiumCache,
 };

@@ -1,5 +1,6 @@
 const { pool } = require('../config/database');
 const { successResponse, errorResponse } = require('../utils/helpers');
+const { getPodiumStats } = require('../services/scoring.service');
 
 // Verifica se o usuário é membro ativo da liga
 async function isMember(leagueId, userId) {
@@ -79,6 +80,15 @@ async function getPosts(req, res, next) {
        ORDER BY p.is_pinned DESC, p.created_at DESC`,
       [leagueId, userId]
     );
+
+    // Enriquece posts com podiumStats dos autores
+    const authorIds = [...new Set(result.rows.map(p => p.user_id))];
+    if (authorIds.length > 0) {
+      const podium = await getPodiumStats(authorIds);
+      for (const post of result.rows) {
+        post.podium_stats = podium[post.user_id] || { gold: 0, silver: 0, bronze: 0 };
+      }
+    }
 
     res.json(successResponse(result.rows));
   } catch (error) {
@@ -298,6 +308,15 @@ async function getComments(req, res, next) {
       [postId]
     );
 
+    // Enriquece comentários com podiumStats
+    const commentAuthorIds = [...new Set(result.rows.map(c => c.user_id))];
+    if (commentAuthorIds.length > 0) {
+      const podium = await getPodiumStats(commentAuthorIds);
+      for (const comment of result.rows) {
+        comment.podium_stats = podium[comment.user_id] || { gold: 0, silver: 0, bronze: 0 };
+      }
+    }
+
     res.json(successResponse(result.rows));
   } catch (error) {
     next(error);
@@ -506,7 +525,7 @@ async function getHighlights(req, res, next) {
 
     // Melhor da última rodada concluída
     const bestLastRaceRes = await pool.query(
-      `SELECT s.points, s.race_id, u.display_name, u.avatar_url, r.name as race_name
+      `SELECT s.user_id, s.points, s.race_id, u.display_name, u.avatar_url, r.name as race_name
        FROM scores s
        JOIN users u ON u.id = s.user_id
        JOIN races r ON r.id = s.race_id
@@ -525,9 +544,16 @@ async function getHighlights(req, res, next) {
       [leagueId]
     );
 
+    // Enriquece bestLastRace com podiumStats
+    let bestLastRace = bestLastRaceRes.rows[0] || null;
+    if (bestLastRace && bestLastRace.user_id) {
+      const podium = await getPodiumStats([bestLastRace.user_id]);
+      bestLastRace.podium_stats = podium[bestLastRace.user_id] || { gold: 0, silver: 0, bronze: 0 };
+    }
+
     res.json(successResponse({
       nextRace: nextRaceRes.rows[0] || null,
-      bestLastRace: bestLastRaceRes.rows[0] || null,
+      bestLastRace,
     }));
   } catch (error) {
     next(error);
