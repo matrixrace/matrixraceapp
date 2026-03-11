@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/tutorial/tutorial_bloc.dart';
+import '../../../../core/tutorial/tutorial_step.dart';
 
 /// Tela de Histórico Esportivo de F1
 /// Seções: GPs (resultados por corrida), Pilotos (standings), Construtores (standings)
@@ -66,6 +69,11 @@ class _F1ResultsScreenState extends State<F1ResultsScreen> {
             results[2].data?['standings'] as List<dynamic>? ?? [];
         _isLoading = false;
       });
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          context.read<TutorialBloc>().add(TutorialScreenVisited('f1results'));
+        }
+      });
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -88,6 +96,7 @@ class _F1ResultsScreenState extends State<F1ResultsScreen> {
   // ── Cabeçalho: dropdown de ano + botões de seção ──────────────
   Widget _buildHeader() {
     return Container(
+      key: TutorialKeys.f1Tabs,
       color: AppTheme.cardBackground,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       child: Row(

@@ -3,6 +3,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/tutorial/tutorial_bloc.dart';
+import '../../../../core/tutorial/tutorial_step.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 
 /// Tela de Perfil Pessoal
@@ -31,6 +33,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
       setState(() {
         _profileData = res.data as Map<String, dynamic>;
         _isLoading = false;
+      });
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          context.read<TutorialBloc>().add(TutorialScreenVisited('profile'));
+        }
       });
     } else {
       setState(() => _isLoading = false);
@@ -115,6 +122,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ],
             const SizedBox(height: 16),
             OutlinedButton.icon(
+              key: TutorialKeys.profileEdit,
               onPressed: () => context.push('/profile/edit').then((_) => _loadProfile()),
               icon: const Icon(Icons.edit_outlined, size: 16),
               label: const Text('Editar Perfil'),

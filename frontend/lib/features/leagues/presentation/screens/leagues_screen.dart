@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/network/api_client.dart';
+import '../../../../core/tutorial/tutorial_bloc.dart';
+import '../../../../core/tutorial/tutorial_step.dart';
 
 /// Tela de Ligas — lista unificada com três filtros em menu suspenso:
 /// 1. Ligas: Minhas / Outras / Todas
@@ -118,7 +121,16 @@ class _LeaguesScreenState extends State<LeaguesScreen> {
         _leagues = result;
         _isLoading = false;
       });
+      _triggerTutorial();
     }
+  }
+
+  void _triggerTutorial() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        context.read<TutorialBloc>().add(TutorialScreenVisited('leagues'));
+      }
+    });
   }
 
   // ── Helpers de label ─────────────────────────────────────────────────────
@@ -180,6 +192,7 @@ class _LeaguesScreenState extends State<LeaguesScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       floatingActionButton: FloatingActionButton.extended(
+        key: TutorialKeys.leaguesCreateBtn,
         onPressed: () => context.go('/leagues/create'),
         backgroundColor: AppTheme.primaryRed,
         icon: const Icon(Icons.add),
@@ -192,6 +205,7 @@ class _LeaguesScreenState extends State<LeaguesScreen> {
             color: AppTheme.cardBackground,
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
             child: SingleChildScrollView(
+              key: TutorialKeys.leaguesFilter,
               scrollDirection: Axis.horizontal,
               child: Row(
                 children: [
@@ -264,6 +278,7 @@ class _LeaguesScreenState extends State<LeaguesScreen> {
 
                   // Botão de código
                   IconButton(
+                    key: TutorialKeys.leaguesCodeBtn,
                     icon: const Icon(Icons.link, size: 20),
                     tooltip: 'Entrar com código',
                     onPressed: _showJoinByCodeDialog,

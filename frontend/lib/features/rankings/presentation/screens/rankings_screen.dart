@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/tutorial/tutorial_bloc.dart';
+import '../../../../core/tutorial/tutorial_step.dart';
 
 /// Tela de Ranking Global
 /// Pontuação por GP (deduplicada entre ligas) com filtros de período
@@ -60,6 +63,11 @@ class _RankingsScreenState extends State<RankingsScreen> {
       setState(() {
         _ranking = res.success && res.data != null ? (res.data as List) : [];
         _isLoading = false;
+      });
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          context.read<TutorialBloc>().add(TutorialScreenVisited('rankings'));
+        }
       });
     }
   }
@@ -135,6 +143,7 @@ class _RankingsScreenState extends State<RankingsScreen> {
             children: [
               // Chips de filtro
               SingleChildScrollView(
+                key: TutorialKeys.rankingsFilters,
                 scrollDirection: Axis.horizontal,
                 child: Row(
                   children: [

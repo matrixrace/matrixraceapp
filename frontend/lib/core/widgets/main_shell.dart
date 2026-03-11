@@ -1,14 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../network/api_client.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_bottom_nav.dart';
+import '../tutorial/tutorial_bloc.dart';
+import '../tutorial/tutorial_step.dart';
+import '../tutorial/tutorial_overlay.dart';
 import '../../features/auth/presentation/bloc/auth_bloc.dart';
 
-/// Shell compartilhado entre as 4 telas principais:
-/// Início, Ligas, Ranking e Perfil.
-/// Fornece AppBar consistente e BottomNavigationBar em todas elas.
+/// Shell compartilhado entre as telas principais.
+/// Fornece AppBar consistente, BottomNavigationBar e TutorialOverlay.
 class MainShell extends StatefulWidget {
   final Widget child;
 
@@ -28,6 +31,7 @@ class _MainShellState extends State<MainShell> {
     super.initState();
     _loadNotificationCount();
     _checkAdmin();
+    _showWelcomeIfNeeded();
   }
 
   Future<void> _loadNotificationCount() async {
@@ -43,6 +47,101 @@ class _MainShellState extends State<MainShell> {
     if (mounted && res.success && res.data != null) {
       setState(() => _isAdmin = res.data['isAdmin'] == true);
     }
+  }
+
+  /// Mostra welcome dialog no primeiro acesso
+  Future<void> _showWelcomeIfNeeded() async {
+    final prefs = await SharedPreferences.getInstance();
+    final shown = prefs.getBool(TutorialBloc.keyWelcomeShown) ?? false;
+    if (shown || !mounted) return;
+
+    await prefs.setBool(TutorialBloc.keyWelcomeShown, true);
+
+    if (!mounted) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) => Dialog(
+          backgroundColor: AppTheme.cardBackground,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+            side: BorderSide(
+              color: AppTheme.primaryGreen.withValues(alpha: 0.3),
+            ),
+          ),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 380),
+            child: Padding(
+              padding: const EdgeInsets.all(28),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: AppTheme.primaryGreen.withValues(alpha: 0.12),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.sports_motorsports,
+                      size: 48,
+                      color: AppTheme.primaryGreen,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  const Text(
+                    'Bem-vindo ao Matrix Race!',
+                    style: TextStyle(
+                      color: AppTheme.textPrimary,
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 14),
+                  const Text(
+                    'Vamos te mostrar como tudo funciona.\n'
+                    'Dicas vão aparecer em cada tela para te guiar pelos principais recursos.',
+                    style: TextStyle(
+                      color: AppTheme.textSecondary,
+                      fontSize: 14,
+                      height: 1.5,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.person, size: 16,
+                          color: AppTheme.textSecondary.withValues(alpha: 0.6)),
+                      const SizedBox(width: 4),
+                      Text(
+                        'Você pode desativar as dicas no menu do usuário',
+                        style: TextStyle(
+                          color: AppTheme.textSecondary.withValues(alpha: 0.6),
+                          fontSize: 11,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () => Navigator.of(ctx).pop(),
+                      child: const Text('Começar!'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    });
   }
 
   int _selectedIndex(BuildContext context) {
@@ -70,12 +169,14 @@ class _MainShellState extends State<MainShell> {
         actions: [
           // Botão "Como Funciona"
           IconButton(
+            key: TutorialKeys.appBarHelp,
             icon: const Icon(Icons.help_outline),
             tooltip: 'Como Funciona',
             onPressed: () => context.push('/how-it-works'),
           ),
           // Sino de notificações com badge
           Stack(
+            key: TutorialKeys.appBarNotifications,
             clipBehavior: Clip.none,
             children: [
               IconButton(
@@ -111,41 +212,68 @@ class _MainShellState extends State<MainShell> {
           ),
           // Menu do usuário
           BlocBuilder<AuthBloc, AuthState>(
-            builder: (context, state) {
-              if (state is AuthAuthenticated) {
-                return PopupMenuButton<String>(
-                  icon: const Icon(Icons.person),
-                  onSelected: (value) {
-                    if (value == 'logout') {
-                      context.read<AuthBloc>().add(AuthLogoutRequested());
-                    } else if (value == 'admin') {
-                      context.go('/admin');
-                    } else if (value == 'profile') {
-                      context.go('/profile');
-                    }
-                  },
-                  itemBuilder: (context) => [
-                    PopupMenuItem(
-                      value: 'profile',
-                      child: Text(state.user.displayName ?? 'Perfil'),
-                    ),
-                    if (_isAdmin)
-                      const PopupMenuItem(
-                        value: 'admin',
-                        child: Row(
-                          children: [
-                            Icon(Icons.admin_panel_settings,
-                                size: 18, color: Colors.red),
-                            SizedBox(width: 8),
-                            Text('Painel Admin'),
-                          ],
+            builder: (context, authState) {
+              if (authState is AuthAuthenticated) {
+                return BlocBuilder<TutorialBloc, TutorialState>(
+                  builder: (context, tutState) {
+                    return PopupMenuButton<String>(
+                      key: TutorialKeys.appBarMenu,
+                      icon: const Icon(Icons.person),
+                      onSelected: (value) {
+                        if (value == 'logout') {
+                          context.read<AuthBloc>().add(AuthLogoutRequested());
+                        } else if (value == 'admin') {
+                          context.go('/admin');
+                        } else if (value == 'profile') {
+                          context.go('/profile');
+                        } else if (value == 'tutorial_toggle') {
+                          context.read<TutorialBloc>().add(
+                            TutorialToggleEnabled(!tutState.tutorialsEnabled),
+                          );
+                        }
+                      },
+                      itemBuilder: (context) => [
+                        PopupMenuItem(
+                          value: 'profile',
+                          child: Text(authState.user.displayName ?? 'Perfil'),
                         ),
-                      ),
-                    const PopupMenuItem(
-                      value: 'logout',
-                      child: Text('Sair'),
-                    ),
-                  ],
+                        PopupMenuItem(
+                          value: 'tutorial_toggle',
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.lightbulb_outline,
+                                size: 18,
+                                color: tutState.tutorialsEnabled
+                                    ? AppTheme.primaryGreen
+                                    : AppTheme.textSecondary,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(tutState.tutorialsEnabled
+                                  ? 'Desativar Dicas'
+                                  : 'Ativar Dicas'),
+                            ],
+                          ),
+                        ),
+                        if (_isAdmin)
+                          const PopupMenuItem(
+                            value: 'admin',
+                            child: Row(
+                              children: [
+                                Icon(Icons.admin_panel_settings,
+                                    size: 18, color: Colors.red),
+                                SizedBox(width: 8),
+                                Text('Painel Admin'),
+                              ],
+                            ),
+                          ),
+                        const PopupMenuItem(
+                          value: 'logout',
+                          child: Text('Sair'),
+                        ),
+                      ],
+                    );
+                  },
                 );
               }
               return TextButton(
@@ -156,8 +284,16 @@ class _MainShellState extends State<MainShell> {
           ),
         ],
       ),
-      body: widget.child,
-      bottomNavigationBar: AppBottomNav(selectedIndex: _selectedIndex(context)),
+      body: Stack(
+        children: [
+          widget.child,
+          const TutorialOverlay(),
+        ],
+      ),
+      bottomNavigationBar: AppBottomNav(
+        key: TutorialKeys.bottomNav,
+        selectedIndex: _selectedIndex(context),
+      ),
     );
   }
 }

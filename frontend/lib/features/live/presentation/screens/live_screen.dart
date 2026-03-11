@@ -1,9 +1,12 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/services/socket_service.dart';
+import '../../../../core/tutorial/tutorial_bloc.dart';
+import '../../../../core/tutorial/tutorial_step.dart';
 
 class LiveScreen extends StatefulWidget {
   const LiveScreen({super.key});
@@ -119,6 +122,11 @@ class _LiveScreenState extends State<LiveScreen> with SingleTickerProviderStateM
           _selectLatestTab();
         }
       });
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          context.read<TutorialBloc>().add(TutorialScreenVisited('live'));
+        }
+      });
     } else {
       setState(() { _loading = false; _error = res.message; });
     }
@@ -206,6 +214,7 @@ class _LiveScreenState extends State<LiveScreen> with SingleTickerProviderStateM
         // Tabs de sessoes
         if (_tabController != null)
           Container(
+            key: TutorialKeys.liveSessionTabs,
             color: AppTheme.cardBackground,
             child: TabBar(
               controller: _tabController,

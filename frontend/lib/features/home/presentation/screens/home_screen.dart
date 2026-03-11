@@ -4,6 +4,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/network/api_client.dart';
+import '../../../../core/tutorial/tutorial_bloc.dart';
+import '../../../../core/tutorial/tutorial_step.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 
 /// Tela Inicial
@@ -101,9 +103,18 @@ class _HomeScreenState extends State<HomeScreen> {
         _upcomingRaces = response.data as List;
         _isLoading = false;
       });
+      _triggerTutorial();
     } else {
       setState(() => _isLoading = false);
     }
+  }
+
+  void _triggerTutorial() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        context.read<TutorialBloc>().add(TutorialScreenVisited('home'));
+      }
+    });
   }
 
   @override
@@ -124,12 +135,12 @@ class _HomeScreenState extends State<HomeScreen> {
       padding: const EdgeInsets.all(16),
       children: [
         if (_upcomingRaces.isNotEmpty) ...[
-          Text('Próxima Corrida', style: Theme.of(context).textTheme.headlineMedium),
+          Text(key: TutorialKeys.homeNextRace, 'Próxima Corrida', style: Theme.of(context).textTheme.headlineMedium),
           const SizedBox(height: 12),
           _buildNextRaceCard(_upcomingRaces[0]),
           const SizedBox(height: 24),
         ],
-        Text('Calendário', style: Theme.of(context).textTheme.titleLarge),
+        Text(key: TutorialKeys.homeCalendar, 'Calendário', style: Theme.of(context).textTheme.titleLarge),
         const SizedBox(height: 12),
         if (_upcomingRaces.isEmpty)
           const Card(
@@ -219,6 +230,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
               SizedBox(
+                key: TutorialKeys.homePredictionBtn,
                 width: double.infinity,
                 child: ElevatedButton.icon(
                   onPressed: () {
