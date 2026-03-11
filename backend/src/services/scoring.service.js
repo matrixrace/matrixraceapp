@@ -113,13 +113,14 @@ async function getLeagueRanking(leagueId) {
       u.display_name,
       u.avatar_url,
       COALESCE(SUM(s.points), 0) as total_points,
-      COUNT(DISTINCT s.race_id) as races_played
+      COUNT(DISTINCT s.race_id) as races_played,
+      lm.joined_at
     FROM league_members lm
     JOIN users u ON u.id = lm.user_id
     LEFT JOIN scores s ON s.user_id = lm.user_id AND s.league_id = lm.league_id
     WHERE lm.league_id = $1 AND u.is_admin = false
-    GROUP BY u.id, u.display_name, u.avatar_url
-    ORDER BY total_points DESC`,
+    GROUP BY u.id, u.display_name, u.avatar_url, lm.joined_at
+    ORDER BY total_points DESC, lm.joined_at ASC`,
     [leagueId]
   );
 
@@ -130,6 +131,7 @@ async function getLeagueRanking(leagueId) {
     avatarUrl: row.avatar_url,
     totalPoints: parseInt(row.total_points, 10),
     racesPlayed: parseInt(row.races_played, 10),
+    joinedAt: row.joined_at,
   }));
 }
 

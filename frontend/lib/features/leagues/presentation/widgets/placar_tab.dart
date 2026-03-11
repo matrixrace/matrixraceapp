@@ -74,11 +74,27 @@ class _PlacarTabState extends State<PlacarTab>
 
     return RefreshIndicator(
       onRefresh: _load,
-      child: ListView.separated(
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        itemCount: _ranking.length,
-        separatorBuilder: (_, _) => const Divider(height: 1, indent: 16),
-        itemBuilder: (context, i) {
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+            child: Row(
+              children: [
+                Icon(Icons.info_outline, size: 14, color: AppTheme.textSecondary),
+                const SizedBox(width: 4),
+                Text(
+                  'Em caso de empate, quem entrou primeiro na liga fica acima.',
+                  style: TextStyle(fontSize: 11, color: AppTheme.textSecondary),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: ListView.separated(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              itemCount: _ranking.length,
+              separatorBuilder: (_, _) => const Divider(height: 1, indent: 16),
+              itemBuilder: (context, i) {
           final entry = _ranking[i] as Map<String, dynamic>;
           final position = entry['position'] as int? ?? i + 1;
           final userId = entry['userId'] ?? entry['user_id'];
@@ -86,8 +102,7 @@ class _PlacarTabState extends State<PlacarTab>
           final avatar = entry['avatarUrl'] ?? entry['avatar_url'];
           final points =
               int.tryParse(entry['totalPoints']?.toString() ?? '0') ?? 0;
-          final races =
-              int.tryParse(entry['racesPlayed']?.toString() ?? '0') ?? 0;
+          final joinedAt = entry['joinedAt']?.toString();
           final isMe = userId.toString() == widget.myUserId;
 
           return InkWell(
@@ -138,7 +153,7 @@ class _PlacarTabState extends State<PlacarTab>
                         ),
                       ),
                       Text(
-                        '$races ${races == 1 ? 'corrida' : 'corridas'}',
+                        _formatJoinedAt(joinedAt),
                         style: const TextStyle(
                             fontSize: 11, color: AppTheme.textSecondary),
                       ),
@@ -165,6 +180,9 @@ class _PlacarTabState extends State<PlacarTab>
           ),
           );
         },
+      ),
+          ),
+        ],
       ),
     );
   }
@@ -194,6 +212,17 @@ class _PlacarTabState extends State<PlacarTab>
           ),
       ],
     );
+  }
+
+  String _formatJoinedAt(String? iso) {
+    if (iso == null) return '';
+    final dt = DateTime.tryParse(iso)?.toLocal();
+    if (dt == null) return '';
+    return 'Entrou em ${dt.day.toString().padLeft(2, '0')}/'
+        '${dt.month.toString().padLeft(2, '0')}/${dt.year} '
+        '${dt.hour.toString().padLeft(2, '0')}:'
+        '${dt.minute.toString().padLeft(2, '0')}:'
+        '${dt.second.toString().padLeft(2, '0')}';
   }
 
   Widget _positionWidget(int position) {
