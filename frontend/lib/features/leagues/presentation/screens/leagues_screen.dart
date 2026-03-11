@@ -26,6 +26,9 @@ class _LeaguesScreenState extends State<LeaguesScreen> {
   String? _selectedRaceId;
   String? _selectedRaceName;
 
+  // ── Busca por nome ──────────────────────────────────────────────────────
+  String _searchQuery = '';
+
   // ── Dados ────────────────────────────────────────────────────────────────
   List<dynamic> _leagues = [];
   List<dynamic> _allRaces = [];
@@ -148,45 +151,15 @@ class _LeaguesScreenState extends State<LeaguesScreen> {
 
   String get _raceLabel => _selectedRaceName ?? 'Todos os GPs';
 
-  // ── Diálogo: Entrar com código ───────────────────────────────────────────
-  void _showJoinByCodeDialog() {
-    final codeController = TextEditingController();
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Entrar com Código'),
-        content: TextField(
-          controller: codeController,
-          decoration: const InputDecoration(hintText: 'Digite o código da liga'),
-          textCapitalization: TextCapitalization.characters,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancelar'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              final code = codeController.text.trim();
-              if (code.isNotEmpty) {
-                final response =
-                    await _api.post('/leagues/join-by-code', body: {'code': code});
-                if (ctx.mounted) {
-                  Navigator.pop(ctx);
-                  ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
-                    content: Text(response.message),
-                    backgroundColor: response.success ? Colors.green : Colors.red,
-                  ));
-                  if (response.success) _loadLeagues();
-                }
-              }
-            },
-            child: const Text('Entrar'),
-          ),
-        ],
-      ),
-    );
+  List<dynamic> get _filteredLeagues {
+    if (_searchQuery.isEmpty) return _leagues;
+    final query = _searchQuery.toLowerCase();
+    return _leagues.where((l) {
+      final name = (l['name'] ?? '').toString().toLowerCase();
+      return name.contains(query);
+    }).toList();
   }
+
 
   @override
   Widget build(BuildContext context) {
@@ -274,21 +247,29 @@ class _LeaguesScreenState extends State<LeaguesScreen> {
                       _loadLeagues();
                     },
                   ),
-                  const SizedBox(width: 6),
-
-                  // Botão de código
-                  IconButton(
-                    key: TutorialKeys.leaguesCodeBtn,
-                    icon: const Icon(Icons.link, size: 20),
-                    tooltip: 'Entrar com código',
-                    onPressed: _showJoinByCodeDialog,
-                    style: IconButton.styleFrom(
-                      backgroundColor: AppTheme.surfaceColor,
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8)),
-                    ),
-                  ),
                 ],
+              ),
+            ),
+          ),
+
+          // ── Barra de busca por nome ──────────────────────────────────
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            child: TextField(
+              onChanged: (value) => setState(() => _searchQuery = value),
+              style: const TextStyle(fontSize: 14, color: AppTheme.textPrimary),
+              decoration: InputDecoration(
+                hintText: 'Buscar liga por nome...',
+                hintStyle: const TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+                prefixIcon: const Icon(Icons.search, size: 20, color: AppTheme.textSecondary),
+                filled: true,
+                fillColor: AppTheme.surfaceColor,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide.none,
+                ),
+                isDense: true,
               ),
             ),
           ),
@@ -297,7 +278,7 @@ class _LeaguesScreenState extends State<LeaguesScreen> {
           Expanded(
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
-                : _leagues.isEmpty
+                : _filteredLeagues.isEmpty
                     ? Center(
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
@@ -322,9 +303,9 @@ class _LeaguesScreenState extends State<LeaguesScreen> {
                         onRefresh: _loadLeagues,
                         child: ListView.builder(
                           padding: const EdgeInsets.fromLTRB(16, 12, 16, 80),
-                          itemCount: _leagues.length,
+                          itemCount: _filteredLeagues.length,
                           itemBuilder: (context, index) =>
-                              _buildLeagueCard(_leagues[index]),
+                              _buildLeagueCard(_filteredLeagues[index]),
                         ),
                       ),
           ),

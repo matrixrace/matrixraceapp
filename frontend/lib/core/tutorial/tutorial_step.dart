@@ -35,7 +35,6 @@ class TutorialKeys {
   // Leagues
   static final leaguesFilter = GlobalKey(debugLabel: 'tut_leagues_filter');
   static final leaguesCreateBtn = GlobalKey(debugLabel: 'tut_leagues_create');
-  static final leaguesCodeBtn = GlobalKey(debugLabel: 'tut_leagues_code');
 
   // Live
   static final liveSessionTabs = GlobalKey(debugLabel: 'tut_live_tabs');
@@ -88,18 +87,12 @@ final Map<String, List<TutorialStep>> tutorialStepsMap = {
       targetKey: TutorialKeys.leaguesCreateBtn,
       position: TooltipPosition.above,
     ),
-    TutorialStep(
-      title: 'Entrar com Código',
-      description: 'Tem um código de liga? Use aqui para entrar diretamente.',
-      targetKey: TutorialKeys.leaguesCodeBtn,
-      position: TooltipPosition.below,
-    ),
   ],
   'live': [
     TutorialStep(
       title: 'Sessões ao Vivo',
       description:
-          'Alterne entre TL1, Classificação, Sprint e Corrida para ver cada resultado em tempo real.',
+          'Altere entre sessões para ver cada resultado em tempo real.',
       targetKey: TutorialKeys.liveSessionTabs,
       position: TooltipPosition.below,
     ),
