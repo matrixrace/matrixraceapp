@@ -13,118 +13,121 @@ const VALID_SESSION_TYPES = ['FP1', 'FP2', 'FP3', 'qualifying', 'sprint_qualifyi
 // ADMIN: ATUALIZAR SESSAO VIA OPENF1
 // ==================
 
+// Logica pura de refresh (sem dependencia de req/res) — reutilizada pelo auto-refresh
+async function doSessionRefresh(raceId, sessionType) {
+  if (!VALID_SESSION_TYPES.includes(sessionType)) {
+    throw new Error('Tipo de sessao invalido');
+  }
+
+  const [race] = await db.select().from(races).where(eq(races.id, raceId)).limit(1);
+  if (!race) throw new Error('Corrida nao encontrada');
+
+  // Busca posicoes anteriores para comparacao (notificacoes)
+  const previousResults = await pool.query(
+    'SELECT driver_id, position FROM session_results WHERE race_id = $1 AND session_type = $2',
+    [raceId, sessionType]
+  );
+  const prevPositions = {};
+  for (const r of previousResults.rows) {
+    prevPositions[r.driver_id] = r.position;
+  }
+
+  // Busca dados da OpenF1 API
+  const apiData = await fetchSessionData(race.season, race.round, sessionType, race.country, race.name);
+
+  // Busca mapeamento driver_number -> driver_id do nosso banco
+  const allDrivers = await db.select().from(drivers).where(eq(drivers.isActive, true));
+  const driverMap = {};
+  for (const d of allDrivers) {
+    if (d.number) driverMap[d.number] = d.id;
+  }
+
+  // Remove resultados anteriores desta sessao
+  await pool.query(
+    'DELETE FROM session_results WHERE race_id = $1 AND session_type = $2',
+    [raceId, sessionType]
+  );
+
+  // Insere novos resultados
+  const insertedResults = [];
+  for (const r of apiData.results) {
+    const driverId = driverMap[r.driverNumber];
+    if (!driverId) {
+      logger.warn(`Piloto com numero ${r.driverNumber} nao encontrado no banco`);
+      continue;
+    }
+
+    await pool.query(
+      `INSERT INTO session_results (race_id, session_type, driver_id, position, best_lap_time, gap, tire_compound, pit_stops, status, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())`,
+      [raceId, sessionType, driverId, r.position, r.bestLapTime, r.gap, r.tireCompound, r.pitStops, r.status]
+    );
+
+    insertedResults.push({
+      driverId,
+      driverNumber: r.driverNumber,
+      position: r.position,
+      bestLapTime: r.bestLapTime,
+      gap: r.gap,
+      tireCompound: r.tireCompound,
+      pitStops: r.pitStops,
+      status: r.status,
+    });
+  }
+
+  // Remove mensagens de controle anteriores e insere novas
+  await pool.query(
+    'DELETE FROM race_control_messages WHERE race_id = $1 AND session_type = $2',
+    [raceId, sessionType]
+  );
+
+  for (const msg of apiData.raceControl) {
+    await pool.query(
+      `INSERT INTO race_control_messages (race_id, session_type, message, flag, driver_number, happened_at)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [raceId, sessionType, msg.message, msg.flag, msg.driverNumber, msg.happenedAt]
+    );
+  }
+
+  // Emite atualizacao via socket
+  const io = getIo();
+  if (io) {
+    io.to(`race:${raceId}`).emit('session_results_updated', {
+      raceId,
+      sessionType,
+      results: insertedResults,
+      raceControl: apiData.raceControl,
+      updatedAt: new Date().toISOString(),
+    });
+  }
+
+  // Gera notificacoes para pilotos que mudaram de posicao
+  await generatePositionChangeNotifications(raceId, sessionType, insertedResults, prevPositions);
+
+  logger.info(`Sessao ${sessionType} atualizada para corrida ${race.name}: ${insertedResults.length} pilotos`);
+  return {
+    results: insertedResults,
+    raceControl: apiData.raceControl,
+    count: insertedResults.length,
+  };
+}
+
 // POST /api/v1/admin/races/:id/sessions/:sessionType/refresh
 async function refreshSessionFromAPI(req, res, next) {
   try {
     const raceId = parseInt(req.params.id);
     const { sessionType } = req.params;
-
-    if (!VALID_SESSION_TYPES.includes(sessionType)) {
-      return next(errorResponse('Tipo de sessao invalido', 400));
-    }
-
-    const [race] = await db.select().from(races).where(eq(races.id, raceId)).limit(1);
-    if (!race) return next(errorResponse('Corrida nao encontrada', 404));
-
-    // Busca posicoes anteriores para comparacao (notificacoes)
-    const previousResults = await pool.query(
-      'SELECT driver_id, position FROM session_results WHERE race_id = $1 AND session_type = $2',
-      [raceId, sessionType]
-    );
-    const prevPositions = {};
-    for (const r of previousResults.rows) {
-      prevPositions[r.driver_id] = r.position;
-    }
-
-    // Busca dados da OpenF1 API
-    let apiData;
-    try {
-      apiData = await fetchSessionData(race.season, race.round, sessionType, race.country, race.name);
-    } catch (apiError) {
-      logger.error('OpenF1 API error:', apiError.message);
+    const result = await doSessionRefresh(raceId, sessionType);
+    res.json(successResponse(result, `Sessao ${sessionType} atualizada com sucesso`));
+  } catch (error) {
+    if (error.message.includes('Erro ao buscar') || error.message.includes('API') || error.message.includes('Nenhum')) {
+      logger.error('OpenF1 API error:', error.message);
       return res.status(502).json({
         success: false,
-        message: `Erro ao buscar dados da API: ${apiError.message}`,
+        message: `Erro ao buscar dados da API: ${error.message}`,
         data: { manualFallback: true },
       });
     }
-
-    // Busca mapeamento driver_number -> driver_id do nosso banco
-    const allDrivers = await db.select().from(drivers).where(eq(drivers.isActive, true));
-    const driverMap = {};
-    for (const d of allDrivers) {
-      if (d.number) driverMap[d.number] = d.id;
-    }
-
-    // Remove resultados anteriores desta sessao
-    await pool.query(
-      'DELETE FROM session_results WHERE race_id = $1 AND session_type = $2',
-      [raceId, sessionType]
-    );
-
-    // Insere novos resultados
-    const insertedResults = [];
-    for (const r of apiData.results) {
-      const driverId = driverMap[r.driverNumber];
-      if (!driverId) {
-        logger.warn(`Piloto com numero ${r.driverNumber} nao encontrado no banco`);
-        continue;
-      }
-
-      await pool.query(
-        `INSERT INTO session_results (race_id, session_type, driver_id, position, best_lap_time, gap, tire_compound, pit_stops, status, updated_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())`,
-        [raceId, sessionType, driverId, r.position, r.bestLapTime, r.gap, r.tireCompound, r.pitStops, r.status]
-      );
-
-      insertedResults.push({
-        driverId,
-        driverNumber: r.driverNumber,
-        position: r.position,
-        bestLapTime: r.bestLapTime,
-        gap: r.gap,
-        tireCompound: r.tireCompound,
-        pitStops: r.pitStops,
-        status: r.status,
-      });
-    }
-
-    // Remove mensagens de controle anteriores e insere novas
-    await pool.query(
-      'DELETE FROM race_control_messages WHERE race_id = $1 AND session_type = $2',
-      [raceId, sessionType]
-    );
-
-    for (const msg of apiData.raceControl) {
-      await pool.query(
-        `INSERT INTO race_control_messages (race_id, session_type, message, flag, driver_number, happened_at)
-         VALUES ($1, $2, $3, $4, $5, $6)`,
-        [raceId, sessionType, msg.message, msg.flag, msg.driverNumber, msg.happenedAt]
-      );
-    }
-
-    // Emite atualizacao via socket
-    const io = getIo();
-    if (io) {
-      io.to(`race:${raceId}`).emit('session_results_updated', {
-        raceId,
-        sessionType,
-        results: insertedResults,
-        raceControl: apiData.raceControl,
-        updatedAt: new Date().toISOString(),
-      });
-    }
-
-    // Gera notificacoes para pilotos que mudaram de posicao
-    await generatePositionChangeNotifications(raceId, sessionType, insertedResults, prevPositions);
-
-    logger.info(`Sessao ${sessionType} atualizada para corrida ${race.name}: ${insertedResults.length} pilotos`);
-    res.json(successResponse({
-      results: insertedResults,
-      raceControl: apiData.raceControl,
-      count: insertedResults.length,
-    }, `Sessao ${sessionType} atualizada com sucesso`));
-  } catch (error) {
     next(error);
   }
 }
@@ -795,7 +798,60 @@ async function migrateAbbreviations(req, res, next) {
   }
 }
 
+// ==================
+// ADMIN: AUTO-REFRESH
+// ==================
+
+// POST /api/v1/live/admin/auto-refresh/start
+async function startAutoRefresh(req, res, next) {
+  try {
+    const autoRefreshService = require('../services/autoRefresh.service');
+    const { raceId, sessionType, intervalSeconds } = req.body;
+
+    if (!raceId || !sessionType) {
+      return next(errorResponse('raceId e sessionType sao obrigatorios', 400));
+    }
+    if (!VALID_SESSION_TYPES.includes(sessionType)) {
+      return next(errorResponse('Tipo de sessao invalido', 400));
+    }
+
+    const intervalMs = (intervalSeconds || 30) * 1000;
+    if (intervalMs < 10000) return next(errorResponse('Intervalo minimo: 10 segundos', 400));
+
+    await autoRefreshService.start(parseInt(raceId), sessionType, intervalMs);
+
+    logger.info(`Auto-refresh iniciado: raceId=${raceId} sessionType=${sessionType} interval=${intervalMs}ms`);
+    res.json(successResponse(autoRefreshService.getStatus(), 'Auto-refresh iniciado'));
+  } catch (error) {
+    next(error);
+  }
+}
+
+// POST /api/v1/live/admin/auto-refresh/stop
+async function stopAutoRefresh(req, res, next) {
+  try {
+    const autoRefreshService = require('../services/autoRefresh.service');
+    await autoRefreshService.stop();
+
+    logger.info('Auto-refresh parado');
+    res.json(successResponse(autoRefreshService.getStatus(), 'Auto-refresh parado'));
+  } catch (error) {
+    next(error);
+  }
+}
+
+// GET /api/v1/live/admin/auto-refresh/status
+async function getAutoRefreshStatus(req, res, next) {
+  try {
+    const autoRefreshService = require('../services/autoRefresh.service');
+    res.json(successResponse(autoRefreshService.getStatus()));
+  } catch (error) {
+    next(error);
+  }
+}
+
 module.exports = {
+  doSessionRefresh,
   refreshSessionFromAPI,
   manualSessionResults,
   finalizeRaceResults,
@@ -807,4 +863,7 @@ module.exports = {
   getExternalDrivers,
   getExternalRaces,
   externalFinalizeRace,
+  startAutoRefresh,
+  stopAutoRefresh,
+  getAutoRefreshStatus,
 };

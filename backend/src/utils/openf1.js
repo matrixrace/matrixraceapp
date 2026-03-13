@@ -209,12 +209,18 @@ function formatLapTime(durationSeconds) {
   return minutes + ':' + seconds.padStart(6, '0');
 }
 
+function invalidateSessionsCache() {
+  _sessionsCache = null;
+  _sessionsCacheTime = 0;
+}
+
 module.exports = {
   fetchAPI,
   findMeeting,
   fetchSessionData,
   formatLapTime,
   formatGap,
+  invalidateSessionsCache,
   SESSION_TYPE_MAP,
   COUNTRY_MAP,
 };

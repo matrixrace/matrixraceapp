@@ -199,7 +199,7 @@ async function start() {
   // Inicializa Socket.io no servidor HTTP
   initSocket(httpServer, config.frontendUrl);
 
-  httpServer.listen(config.port, () => {
+  httpServer.listen(config.port, async () => {
     logger.info('========================================');
     logger.info(`  F1 Predictions API`);
     logger.info(`  Ambiente: ${config.nodeEnv}`);
@@ -208,6 +208,14 @@ async function start() {
     logger.info(`  Health: http://localhost:${config.port}/api/v1/health`);
     logger.info(`  Socket.io: ativo`);
     logger.info('========================================');
+
+    // Retoma auto-refresh se estava ativo antes do restart
+    try {
+      const autoRefreshService = require('./services/autoRefresh.service');
+      await autoRefreshService.resumeIfActive();
+    } catch (err) {
+      logger.error('Erro ao retomar auto-refresh:', err.message);
+    }
   });
 }
 

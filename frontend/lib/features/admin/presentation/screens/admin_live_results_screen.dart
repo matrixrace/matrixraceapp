@@ -32,6 +32,14 @@ class _AdminLiveResultsScreenState extends State<AdminLiveResultsScreen>
   // Editing state per session
   final Map<String, List<_DriverEntry>> _editingEntries = {};
 
+  // Auto-refresh state
+  bool _autoRefreshActive = false;
+  int? _autoRefreshRaceId;
+  String? _autoRefreshSessionType;
+  String? _autoRefreshLastRefresh;
+  int _autoRefreshErrorCount = 0;
+  bool _togglingAutoRefresh = false;
+
   StreamSubscription? _socketSub;
 
   @override
@@ -39,6 +47,7 @@ class _AdminLiveResultsScreenState extends State<AdminLiveResultsScreen>
     super.initState();
     _loadRaces();
     _loadDrivers();
+    _loadAutoRefreshStatus();
   }
 
   @override
@@ -46,6 +55,51 @@ class _AdminLiveResultsScreenState extends State<AdminLiveResultsScreen>
     _tabController?.dispose();
     _socketSub?.cancel();
     super.dispose();
+  }
+
+  Future<void> _loadAutoRefreshStatus() async {
+    final res = await _api.get('/live/admin/auto-refresh/status');
+    if (!mounted) return;
+    if (res.success && res.data != null) {
+      final data = res.data as Map<String, dynamic>;
+      setState(() {
+        _autoRefreshActive = data['active'] == true;
+        _autoRefreshRaceId = data['raceId'] as int?;
+        _autoRefreshSessionType = data['sessionType'] as String?;
+        _autoRefreshLastRefresh = data['lastRefresh'] as String?;
+        _autoRefreshErrorCount = (data['errorCount'] as int?) ?? 0;
+      });
+    }
+  }
+
+  Future<void> _toggleAutoRefresh(String sessionType) async {
+    if (_selectedRaceId == null) return;
+    setState(() => _togglingAutoRefresh = true);
+
+    final isCurrentlyActive = _autoRefreshActive &&
+        _autoRefreshRaceId == _selectedRaceId &&
+        _autoRefreshSessionType == sessionType;
+
+    if (isCurrentlyActive) {
+      final res = await _api.post('/live/admin/auto-refresh/stop');
+      if (mounted && res.success) {
+        _showSnack('Auto-refresh parado', Colors.orange);
+      }
+    } else {
+      final res = await _api.post('/live/admin/auto-refresh/start', body: {
+        'raceId': _selectedRaceId,
+        'sessionType': sessionType,
+        'intervalSeconds': 30,
+      });
+      if (mounted && res.success) {
+        _showSnack('Auto-refresh ativado (30s)', Colors.green);
+      } else if (mounted) {
+        _showSnack(res.message ?? 'Erro ao ativar', Colors.red);
+      }
+    }
+
+    await _loadAutoRefreshStatus();
+    if (mounted) setState(() => _togglingAutoRefresh = false);
   }
 
   Future<void> _loadRaces() async {
@@ -81,7 +135,10 @@ class _AdminLiveResultsScreenState extends State<AdminLiveResultsScreen>
     _socketSub?.cancel();
     _socket.joinRace(raceId);
     _socketSub = _socket.sessionResultsStream.listen((data) {
-      if (data['raceId'] == _selectedRaceId) _loadSessionData();
+      if (data['raceId'] == _selectedRaceId) {
+        _loadSessionData();
+        _loadAutoRefreshStatus();
+      }
     });
 
     await _loadSessionData();
@@ -460,6 +517,41 @@ class _AdminLiveResultsScreenState extends State<AdminLiveResultsScreen>
                 icon: const Icon(Icons.refresh, size: 18),
                 label: const Text('Resetar'),
               ),
+              const SizedBox(width: 8),
+              // Auto-refresh toggle
+              Builder(builder: (_) {
+                final isThisActive = _autoRefreshActive &&
+                    _autoRefreshRaceId == _selectedRaceId &&
+                    _autoRefreshSessionType == sessionType;
+                return _togglingAutoRefresh
+                    ? const SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: CircularProgressIndicator(strokeWidth: 2))
+                    : isThisActive
+                        ? ElevatedButton.icon(
+                            onPressed: () => _toggleAutoRefresh(sessionType),
+                            icon: const Icon(Icons.stop, size: 18),
+                            label: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Text('Parar Auto-Refresh'),
+                                if (_autoRefreshLastRefresh != null)
+                                  Text(
+                                    'Ultimo: ${_formatTime(_autoRefreshLastRefresh!)}${_autoRefreshErrorCount > 0 ? ' (${_autoRefreshErrorCount} erros)' : ''}',
+                                    style: const TextStyle(fontSize: 9),
+                                  ),
+                              ],
+                            ),
+                            style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.orange.shade700),
+                          )
+                        : OutlinedButton.icon(
+                            onPressed: () => _toggleAutoRefresh(sessionType),
+                            icon: const Icon(Icons.sync, size: 18),
+                            label: const Text('Auto-Refresh'),
+                          );
+              }),
               const Spacer(),
               if (updatedAt != null)
                 Text('Atualizado: ${_formatTime(updatedAt)}',

@@ -11,6 +11,9 @@ const {
   getExternalRaces,
   migrateAbbreviations,
   externalFinalizeRace,
+  startAutoRefresh,
+  stopAutoRefresh,
+  getAutoRefreshStatus,
 } = require('../controllers/live.controller');
 const { authenticate } = require('../middleware/auth');
 const { requireAdmin } = require('../middleware/adminCheck');
@@ -33,6 +36,9 @@ router.get('/races/:id/live-scoring', authenticate, getLiveScoring);
 router.get('/races/:id/live-scoring/league/:leagueId', authenticate, getLeagueLiveScoring);
 
 // Rotas admin
+router.post('/admin/auto-refresh/start', authenticate, requireAdmin, startAutoRefresh);
+router.post('/admin/auto-refresh/stop', authenticate, requireAdmin, stopAutoRefresh);
+router.get('/admin/auto-refresh/status', authenticate, requireAdmin, getAutoRefreshStatus);
 router.post('/admin/races/:id/sessions/:sessionType/refresh', authenticate, requireAdmin, refreshSessionFromAPI);
 router.post('/admin/races/:id/sessions/:sessionType/manual', authenticate, requireAdmin, validate(manualSessionResultsSchema), manualSessionResults);
 router.post('/admin/races/:id/finalize-results', authenticate, requireAdmin, finalizeRaceResults);
