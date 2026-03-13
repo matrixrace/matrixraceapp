@@ -13,6 +13,7 @@ let _state = {
   errorCount: 0,
   lastRefresh: null,
   lastError: null,
+  source: null, // 'manual' | 'scheduler'
 };
 
 // Persiste estado no system_settings
@@ -23,6 +24,7 @@ async function persistState() {
       auto_refresh_race_id: String(_state.raceId || ''),
       auto_refresh_session_type: _state.sessionType || '',
       auto_refresh_interval: String(_state.intervalMs),
+      auto_refresh_source: _state.source || '',
     };
     for (const [key, value] of Object.entries(keys)) {
       await pool.query(
@@ -72,7 +74,7 @@ async function doRefreshCycle() {
   }
 }
 
-async function start(raceId, sessionType, intervalMs = 30000) {
+async function start(raceId, sessionType, intervalMs = 30000, source = 'manual') {
   // Para qualquer refresh anterior
   if (_intervalHandle) {
     clearInterval(_intervalHandle);
@@ -87,6 +89,7 @@ async function start(raceId, sessionType, intervalMs = 30000) {
     errorCount: 0,
     lastRefresh: null,
     lastError: null,
+    source,
   };
 
   await persistState();
@@ -138,8 +141,9 @@ async function resumeIfActive() {
       const intervalMs = parseInt(settings.auto_refresh_interval) || 30000;
 
       if (raceId && sessionType) {
-        logger.info(`[AutoRefresh] Retomando: raceId=${raceId} session=${sessionType} intervalo=${intervalMs}ms`);
-        await start(raceId, sessionType, intervalMs);
+        const source = settings.auto_refresh_source || 'manual';
+        logger.info(`[AutoRefresh] Retomando: raceId=${raceId} session=${sessionType} intervalo=${intervalMs}ms source=${source}`);
+        await start(raceId, sessionType, intervalMs, source);
       }
     }
   } catch (err) {

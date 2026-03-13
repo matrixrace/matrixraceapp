@@ -744,6 +744,41 @@ async function externalFinalizeRace(req, res, next) {
   }
 }
 
+// POST /api/v1/live/external/races/:id/refresh-all
+// POST /api/v1/live/admin/races/:id/refresh-all-sessions
+async function refreshAllSessions(req, res, next) {
+  try {
+    const raceId = parseInt(req.params.id);
+    const [race] = await db.select().from(races).where(eq(races.id, raceId)).limit(1);
+    if (!race) return next(errorResponse('Corrida nao encontrada', 404));
+
+    const sessionTypes = race.isSprintWeekend
+      ? ['FP1', 'sprint_qualifying', 'sprint', 'qualifying', 'race']
+      : ['FP1', 'FP2', 'FP3', 'qualifying', 'race'];
+
+    const refreshed = [];
+    const failed = [];
+
+    for (const st of sessionTypes) {
+      try {
+        const result = await doSessionRefresh(raceId, st);
+        refreshed.push({ sessionType: st, count: result.count });
+      } catch (err) {
+        failed.push({ sessionType: st, error: err.message });
+        logger.warn(`[RefreshAll] ${st} falhou: ${err.message}`);
+      }
+    }
+
+    logger.info(`[RefreshAll] ${race.name}: ${refreshed.length} ok, ${failed.length} falhas`);
+    res.json(successResponse(
+      { refreshed, failed, raceName: race.name },
+      `${refreshed.length} sessoes atualizadas, ${failed.length} falharam`
+    ));
+  } catch (error) {
+    next(error);
+  }
+}
+
 // POST /api/v1/live/external/migrate-abbreviations
 // Migração única: atualiza abreviações dos drivers pelo nome
 async function migrateAbbreviations(req, res, next) {
@@ -863,6 +898,7 @@ module.exports = {
   getExternalDrivers,
   getExternalRaces,
   externalFinalizeRace,
+  refreshAllSessions,
   startAutoRefresh,
   stopAutoRefresh,
   getAutoRefreshStatus,

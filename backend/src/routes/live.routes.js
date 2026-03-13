@@ -11,6 +11,7 @@ const {
   getExternalRaces,
   migrateAbbreviations,
   externalFinalizeRace,
+  refreshAllSessions,
   startAutoRefresh,
   stopAutoRefresh,
   getAutoRefreshStatus,
@@ -29,6 +30,7 @@ router.get('/external/races', authenticateApiKey, getExternalRaces);
 router.post('/external/races/:id/sessions/:sessionType/update', authenticateApiKey, validate(importSessionResultsSchema), importSessionResults);
 router.post('/external/migrate-abbreviations', authenticateApiKey, migrateAbbreviations);
 router.post('/external/races/:id/finalize', authenticateApiKey, externalFinalizeRace);
+router.post('/external/races/:id/refresh-all', authenticateApiKey, refreshAllSessions);
 
 // Rotas publicas (autenticadas)
 router.get('/races/:id/sessions', authenticate, getSessionResults);
@@ -42,5 +44,6 @@ router.get('/admin/auto-refresh/status', authenticate, requireAdmin, getAutoRefr
 router.post('/admin/races/:id/sessions/:sessionType/refresh', authenticate, requireAdmin, refreshSessionFromAPI);
 router.post('/admin/races/:id/sessions/:sessionType/manual', authenticate, requireAdmin, validate(manualSessionResultsSchema), manualSessionResults);
 router.post('/admin/races/:id/finalize-results', authenticate, requireAdmin, finalizeRaceResults);
+router.post('/admin/races/:id/refresh-all-sessions', authenticate, requireAdmin, refreshAllSessions);
 
 module.exports = router;

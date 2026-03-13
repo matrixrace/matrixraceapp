@@ -1,10 +1,21 @@
-<!DOCTYPE html><html lang=pt-BR><head><meta charset=UTF-8><title>Matrix Race - Importar</title><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:sans-serif;background:#0a0f1a;color:#e0e0e0;min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:20px}h1{color:#4caf50;margin-bottom:8px;font-size:24px}.sub{color:#888;margin-bottom:24px;font-size:14px}.ctn{max-width:700px;width:100%}.cd{background:#1a1f2e;border-radius:12px;padding:20px;margin-bottom:16px}label{display:block;font-size:13px;color:#aaa;margin-bottom:6px;font-weight:600}input,select,textarea{width:100%;padding:10px 12px;border:1px solid #333;border-radius:8px;background:#0d1117;color:#e0e0e0;font-size:14px;outline:none}input:focus,select:focus,textarea:focus{border-color:#4caf50}textarea{min-height:220px;font-family:monospace;font-size:13px;resize:vertical}.rw{display:flex;gap:12px;margin-bottom:14px}.rw>div{flex:1}.bt{padding:12px 24px;border:none;border-radius:8px;font-size:15px;font-weight:600;cursor:pointer}.bp{background:#4caf50;color:#fff;width:100%}.bp:hover{background:#388e3c}.bp:disabled{background:#333;color:#666;cursor:not-allowed}.bf{background:#f44336;color:#fff;width:100%;margin-top:10px}.bf:hover{background:#c62828}.bf:disabled{background:#333;color:#666;cursor:not-allowed}.st{margin-top:14px;padding:12px;border-radius:8px;font-size:13px;display:none}.st.ok{display:block;background:#1b3a1b;border:1px solid #4caf50;color:#4caf50}.st.er{display:block;background:#3a1b1b;border:1px solid #f44336;color:#f44336}.st.in{display:block;background:#1b2a3a;border:1px solid #2196f3;color:#2196f3}.st.wa{display:block;background:#3a2a00;border:1px solid #ff9800;color:#ff9800}.hp{font-size:12px;color:#666;margin-top:6px}.akr{display:flex;gap:8px}.akr input{flex:1}.bs{padding:10px 16px;font-size:13px;border:1px solid #333;background:#1a1f2e;color:#aaa;border-radius:8px;cursor:pointer;white-space:nowrap}.bs:hover{border-color:#4caf50;color:#4caf50}.rt{width:100%;margin-top:12px;border-collapse:collapse}.rt th,.rt td{padding:6px 10px;text-align:left;font-size:13px;border-bottom:1px solid #222}.rt th{color:#888}.bg{display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600}.bg-ok{background:#1b3a1b;color:#4caf50}.bg-sk{background:#3a3a1b;color:#ff9800}.divider{border:none;border-top:1px solid #2a2f3e;margin:16px 0}.fin-box{background:#1a0d0d;border:1px solid #f44336;border-radius:10px;padding:16px;margin-top:16px}.fin-box p{font-size:13px;color:#aaa;margin-bottom:12px}.sc-table{width:100%;border-collapse:collapse;margin-top:8px}.sc-table th,.sc-table td{padding:6px 10px;text-align:left;font-size:13px;border-bottom:1px solid #2a0a0a}.sc-table th{color:#f44336}</style></head><body><div class=ctn>
+<!DOCTYPE html><html lang=pt-BR><head><meta charset=UTF-8><title>Matrix Race - Importar</title><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:sans-serif;background:#0a0f1a;color:#e0e0e0;min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:20px}h1{color:#4caf50;margin-bottom:8px;font-size:24px}.sub{color:#888;margin-bottom:24px;font-size:14px}.ctn{max-width:700px;width:100%}.cd{background:#1a1f2e;border-radius:12px;padding:20px;margin-bottom:16px}label{display:block;font-size:13px;color:#aaa;margin-bottom:6px;font-weight:600}input,select,textarea{width:100%;padding:10px 12px;border:1px solid #333;border-radius:8px;background:#0d1117;color:#e0e0e0;font-size:14px;outline:none}input:focus,select:focus,textarea:focus{border-color:#4caf50}textarea{min-height:220px;font-family:monospace;font-size:13px;resize:vertical}.rw{display:flex;gap:12px;margin-bottom:14px}.rw>div{flex:1}.bt{padding:12px 24px;border:none;border-radius:8px;font-size:15px;font-weight:600;cursor:pointer}.bp{background:#4caf50;color:#fff;width:100%}.bp:hover{background:#388e3c}.bp:disabled{background:#333;color:#666;cursor:not-allowed}.bf{background:#f44336;color:#fff;width:100%;margin-top:10px}.bf:hover{background:#c62828}.bf:disabled{background:#333;color:#666;cursor:not-allowed}.bo{background:#2196f3;color:#fff;width:100%}.bo:hover{background:#1565c0}.bo:disabled{background:#333;color:#666;cursor:not-allowed}.st{margin-top:14px;padding:12px;border-radius:8px;font-size:13px;display:none}.st.ok{display:block;background:#1b3a1b;border:1px solid #4caf50;color:#4caf50}.st.er{display:block;background:#3a1b1b;border:1px solid #f44336;color:#f44336}.st.in{display:block;background:#1b2a3a;border:1px solid #2196f3;color:#2196f3}.st.wa{display:block;background:#3a2a00;border:1px solid #ff9800;color:#ff9800}.hp{font-size:12px;color:#666;margin-top:6px}.akr{display:flex;gap:8px}.akr input{flex:1}.bs{padding:10px 16px;font-size:13px;border:1px solid #333;background:#1a1f2e;color:#aaa;border-radius:8px;cursor:pointer;white-space:nowrap}.bs:hover{border-color:#4caf50;color:#4caf50}.rt{width:100%;margin-top:12px;border-collapse:collapse}.rt th,.rt td{padding:6px 10px;text-align:left;font-size:13px;border-bottom:1px solid #222}.rt th{color:#888}.bg{display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600}.bg-ok{background:#1b3a1b;color:#4caf50}.bg-sk{background:#3a3a1b;color:#ff9800}.bg-er{background:#3a1b1b;color:#f44336}.divider{border:none;border-top:1px solid #2a2f3e;margin:16px 0}.fin-box{background:#1a0d0d;border:1px solid #f44336;border-radius:10px;padding:16px;margin-top:16px}.fin-box p{font-size:13px;color:#aaa;margin-bottom:12px}.sc-table{width:100%;border-collapse:collapse;margin-top:8px}.sc-table th,.sc-table td{padding:6px 10px;text-align:left;font-size:13px;border-bottom:1px solid #2a0a0a}.sc-table th{color:#f44336}.ref-box{background:#0d1a2e;border:1px solid #2196f3;border-radius:10px;padding:16px;margin-bottom:16px}.ref-box p{font-size:13px;color:#aaa;margin-bottom:12px}</style></head><body><div class=ctn>
 <h1>Matrix Race - Importar Resultados</h1><p class=sub>Cole o JSON gerado pelo Claude.ai para importar resultados</p>
 
 <div class=cd><label>API Key</label><div class=akr><input type=password id=ak placeholder="Cole sua API key"><button class=bs onclick=toggleKey()>Mostrar</button><button class=bs onclick=saveKey()>Salvar</button></div><p class=hp>Salva no localStorage</p></div>
 
+<div class=ref-box>
+  <label style="color:#2196f3;font-size:15px">Atualizar Todas as Sessoes via API</label>
+  <p>Busca dados da API da F1 para TODAS as sessoes da corrida selecionada (preenche sessoes passadas automaticamente).</p>
+  <div class=rw><div><label>Corrida</label><select id=rs><option value="">Insira API key e Salve</option></select></div></div>
+  <button class="bt bo" id=rab onclick=doRefreshAll()>Atualizar Todas as Sessoes</button>
+  <div id=rast class=st></div>
+  <div id=ratb style=display:none>
+    <table class=rt><thead><tr><th>Sessao</th><th>Pilotos</th><th>Status</th></tr></thead><tbody id=rarb></tbody></table>
+  </div>
+</div>
+
 <div class=cd>
-  <div class=rw><div><label>Corrida</label><select id=rs><option value="">Insira API key e Salve</option></select></div><div><label>Sessao</label><select id=ss><option value=FP1>TL1</option><option value=FP2>TL2</option><option value=FP3>TL3</option><option value=qualifying>Classificacao</option><option value=sprint_qualifying>Quali Sprint</option><option value=sprint>Sprint</option><option value=race>Corrida</option></select></div></div>
+  <div class=rw><div><label>Sessao (import manual)</label><select id=ss><option value=FP1>TL1</option><option value=FP2>TL2</option><option value=FP3>TL3</option><option value=qualifying>Classificacao</option><option value=sprint_qualifying>Quali Sprint</option><option value=sprint>Sprint</option><option value=race>Corrida</option></select></div></div>
   <label>JSON dos Resultados</label><textarea id=jt></textarea>
   <p class=hp>Array: abbreviation, position, bestLapTime (P1), gap (P2+)</p>
   <div style="margin-top:16px"><button class="bt bp" id=ib onclick=doImport()>Importar Resultados</button></div>
@@ -36,6 +47,9 @@ function saveKey(){localStorage.setItem("mak",gk());shs("API key salva","in");lr
 function gk(){return document.getElementById("ak").value.trim();}
 function shs(m,t){var e=document.getElementById("st");e.textContent=m;e.className="st "+t;}
 function shf(m,t){var e=document.getElementById("fst");e.textContent=m;e.className="st "+t;}
+function shra(m,t){var e=document.getElementById("rast");e.textContent=m;e.className="st "+t;}
+
+var _sessionLabels={"FP1":"TL1","FP2":"TL2","FP3":"TL3","qualifying":"Classificacao","sprint_qualifying":"Classif. Sprint","sprint":"Sprint","race":"Corrida"};
 
 async function lr(){
   var k=gk();if(!k)return;
@@ -49,9 +63,38 @@ async function lr(){
       o.value=x.id;
       o.textContent="R"+x.round+" - "+x.name+" ("+x.season+")";
       if(x.isCompleted)o.textContent+=" [Finalizada]";
+      if(x.isSprintWeekend)o.textContent+=" [Sprint]";
       s.appendChild(o);
     });
   }catch(e){document.getElementById("rs").innerHTML="<option>Erro</option>";}
+}
+
+async function doRefreshAll(){
+  var k=gk(),rid=document.getElementById("rs").value;
+  if(!k)return shra("Insira API key","er");
+  if(!rid)return shra("Selecione corrida","er");
+  var b=document.getElementById("rab");b.disabled=true;b.textContent="Atualizando...";
+  shra("Buscando dados da API para todas as sessoes...","in");
+  try{
+    var r=await fetch(AB+"/external/races/"+rid+"/refresh-all",{method:"POST",headers:{"Content-Type":"application/json","X-API-Key":k}});
+    var j=await r.json();
+    if(!j.success)throw new Error(j.message||"Erro");
+    var d=j.data;
+    shra(j.message,"ok");
+    var tb=document.getElementById("ratb"),rb=document.getElementById("rarb");
+    rb.innerHTML="";tb.style.display="block";
+    d.refreshed.forEach(function(x){
+      var t=document.createElement("tr");
+      t.innerHTML="<td>"+(_sessionLabels[x.sessionType]||x.sessionType)+"</td><td>"+x.count+"</td><td><span class='bg bg-ok'>OK</span></td>";
+      rb.appendChild(t);
+    });
+    d.failed.forEach(function(x){
+      var t=document.createElement("tr");
+      t.innerHTML="<td>"+(_sessionLabels[x.sessionType]||x.sessionType)+"</td><td>-</td><td><span class='bg bg-er' title='"+x.error+"'>FALHA</span></td>";
+      rb.appendChild(t);
+    });
+  }catch(e){shra("Erro: "+e.message,"er");}
+  finally{b.disabled=false;b.textContent="Atualizar Todas as Sessoes";}
 }
 
 async function doImport(){
@@ -73,15 +116,14 @@ async function doImport(){
     tb.innerHTML="";c.style.display="block";
     d.results.forEach(function(x){
       var t=document.createElement("tr");
-      t.innerHTML="<td>"+x.position+"</td><td>"+x.abbreviation+"</td><td>"+(x.bestLapTime||x.gap||"-")+"</td><td><span class=bg-ok>OK</span></td>";
+      t.innerHTML="<td>"+x.position+"</td><td>"+x.abbreviation+"</td><td>"+(x.bestLapTime||x.gap||"-")+"</td><td><span class='bg bg-ok'>OK</span></td>";
       tb.appendChild(t);
     });
     d.skipped.forEach(function(x){
       var t=document.createElement("tr");
-      t.innerHTML="<td>-</td><td>"+x+"</td><td>-</td><td><span class=bg-sk>SKIP</span></td>";
+      t.innerHTML="<td>-</td><td>"+x+"</td><td>-</td><td><span class='bg bg-sk'>SKIP</span></td>";
       tb.appendChild(t);
     });
-    // Mostra botao de finalizar apenas se importou sessao "race"
     if(st==="race" && d.inserted > 0){
       document.getElementById("fb").style.display="block";
     }
@@ -100,7 +142,6 @@ async function doFinalize(){
     var j=await r.json();
     if(!j.success)throw new Error(j.message||"Erro");
     shf(j.message,"ok");
-    // Mostra top pontuadores se disponivel
     var sc=document.getElementById("sc"),sb=document.getElementById("sb");
     var scores=j.data&&j.data.scores;
     if(scores&&scores.length>0){
@@ -112,7 +153,6 @@ async function doFinalize(){
       });
       sc.style.display="block";
     }
-    // Atualiza dropdown marcando corrida como finalizada
     lr();
   }catch(e){shf("Erro: "+e.message,"er");}
   finally{b.disabled=false;b.textContent="Confirmar Resultado Final";}

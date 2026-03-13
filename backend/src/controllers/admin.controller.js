@@ -300,9 +300,12 @@ async function updateRace(req, res, next) {
   try {
     const { id } = req.params;
     const data = { ...req.body, updatedAt: new Date() };
-    if (data.raceDate)       data.raceDate       = new Date(data.raceDate);
-    if (data.fp1Date)        data.fp1Date        = new Date(data.fp1Date);
-    if (data.qualifyingDate) data.qualifyingDate = new Date(data.qualifyingDate);
+    if (data.raceDate)               data.raceDate               = new Date(data.raceDate);
+    if (data.fp1Date)                data.fp1Date                = new Date(data.fp1Date);
+    if (data.qualifyingDate)         data.qualifyingDate         = new Date(data.qualifyingDate);
+    if (data.sprintQualifyingDate)   data.sprintQualifyingDate   = new Date(data.sprintQualifyingDate);
+    if (data.sprintDate)             data.sprintDate             = new Date(data.sprintDate);
+    if (data.isSprintWeekend !== undefined) data.isSprintWeekend = Boolean(data.isSprintWeekend);
 
     const [race] = await db
       .update(races)

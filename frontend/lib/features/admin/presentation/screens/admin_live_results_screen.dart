@@ -39,6 +39,8 @@ class _AdminLiveResultsScreenState extends State<AdminLiveResultsScreen>
   String? _autoRefreshLastRefresh;
   int _autoRefreshErrorCount = 0;
   bool _togglingAutoRefresh = false;
+  String? _autoRefreshSource; // 'manual' | 'scheduler'
+  bool _refreshingAll = false;
 
   StreamSubscription? _socketSub;
 
@@ -68,6 +70,7 @@ class _AdminLiveResultsScreenState extends State<AdminLiveResultsScreen>
         _autoRefreshSessionType = data['sessionType'] as String?;
         _autoRefreshLastRefresh = data['lastRefresh'] as String?;
         _autoRefreshErrorCount = (data['errorCount'] as int?) ?? 0;
+        _autoRefreshSource = data['source'] as String?;
       });
     }
   }
@@ -288,6 +291,68 @@ class _AdminLiveResultsScreenState extends State<AdminLiveResultsScreen>
     }
   }
 
+  Future<void> _refreshAllSessions() async {
+    if (_selectedRaceId == null) return;
+    setState(() => _refreshingAll = true);
+
+    final res = await _api
+        .post('/live/admin/races/$_selectedRaceId/refresh-all-sessions');
+    if (!mounted) return;
+    setState(() => _refreshingAll = false);
+
+    if (res.success && res.data != null) {
+      final data = res.data as Map<String, dynamic>;
+      final refreshed = (data['refreshed'] as List?) ?? [];
+      final failed = (data['failed'] as List?) ?? [];
+
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            backgroundColor: AppTheme.cardBackground,
+            title: const Text('Resultado do Refresh'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                for (final r in refreshed)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 2),
+                    child: Row(children: [
+                      const Icon(Icons.check_circle,
+                          color: Colors.green, size: 16),
+                      const SizedBox(width: 8),
+                      Text(
+                          '${_sessionLabel(r['sessionType'] ?? '')} - ${r['count']} pilotos'),
+                    ]),
+                  ),
+                for (final f in failed)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 2),
+                    child: Row(children: [
+                      const Icon(Icons.error, color: Colors.red, size: 16),
+                      const SizedBox(width: 8),
+                      Expanded(
+                          child: Text(
+                              '${_sessionLabel(f['sessionType'] ?? '')} - ${f['error']}')),
+                    ]),
+                  ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('OK')),
+            ],
+          ),
+        );
+      }
+      await _loadSessionData();
+    } else {
+      _showSnack(res.message ?? 'Erro ao atualizar', Colors.red);
+    }
+  }
+
   void _showSnack(String msg, Color color) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -448,6 +513,22 @@ class _AdminLiveResultsScreenState extends State<AdminLiveResultsScreen>
                           fontWeight: FontWeight.bold)),
                 ),
               ],
+              const Spacer(),
+              // Refresh all sessions button
+              ElevatedButton.icon(
+                onPressed: _refreshingAll ? null : _refreshAllSessions,
+                icon: _refreshingAll
+                    ? const SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: Colors.white))
+                    : const Icon(Icons.cloud_download, size: 18),
+                label: Text(
+                    _refreshingAll ? 'Atualizando...' : 'Atualizar Todas'),
+                style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blue.shade700),
+              ),
             ],
           ),
         ),
@@ -538,7 +619,7 @@ class _AdminLiveResultsScreenState extends State<AdminLiveResultsScreen>
                                 const Text('Parar Auto-Refresh'),
                                 if (_autoRefreshLastRefresh != null)
                                   Text(
-                                    'Ultimo: ${_formatTime(_autoRefreshLastRefresh!)}${_autoRefreshErrorCount > 0 ? ' (${_autoRefreshErrorCount} erros)' : ''}',
+                                    '${_autoRefreshSource == 'scheduler' ? '[Auto] ' : ''}Ultimo: ${_formatTime(_autoRefreshLastRefresh!)}${_autoRefreshErrorCount > 0 ? ' (${_autoRefreshErrorCount} erros)' : ''}',
                                     style: const TextStyle(fontSize: 9),
                                   ),
                               ],

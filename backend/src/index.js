@@ -216,6 +216,14 @@ async function start() {
     } catch (err) {
       logger.error('Erro ao retomar auto-refresh:', err.message);
     }
+
+    // Inicia agendador automatico de sessoes (verifica a cada 1 min)
+    try {
+      const sessionScheduler = require('./services/sessionScheduler.service');
+      sessionScheduler.start();
+    } catch (err) {
+      logger.error('Erro ao iniciar session scheduler:', err.message);
+    }
   });
 }
 
