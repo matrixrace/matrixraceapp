@@ -61,7 +61,8 @@ function fetchAPI(path) {
           const parsed = JSON.parse(data);
           resolve(parsed);
         } catch (e) {
-          reject(new Error('Falha ao parsear resposta da F1Dashboard API'));
+          logger.error('F1Dashboard parse error. Status: ' + resp.statusCode + '. Body (200 chars): ' + data.slice(0, 200));
+          reject(new Error('Falha ao parsear resposta da F1Dashboard API (status=' + resp.statusCode + ')'));
         }
       });
     }).on('error', (err) => {

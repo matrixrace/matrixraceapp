@@ -35,11 +35,13 @@ async function doSessionRefresh(raceId, sessionType) {
   // Busca dados da OpenF1 API
   const apiData = await fetchSessionData(race.season, race.round, sessionType, race.country, race.name);
 
-  // Busca mapeamento driver_number -> driver_id do nosso banco
+  // Busca mapeamento driver_code (abbreviation) -> driver_id do nosso banco
   const allDrivers = await db.select().from(drivers).where(eq(drivers.isActive, true));
-  const driverMap = {};
+  const driverByCode = {};
+  const driverByNumber = {};
   for (const d of allDrivers) {
-    if (d.number) driverMap[d.number] = d.id;
+    if (d.abbreviation) driverByCode[d.abbreviation] = d.id;
+    if (d.number) driverByNumber[d.number] = d.id;
   }
 
   // Remove resultados anteriores desta sessao
@@ -51,9 +53,10 @@ async function doSessionRefresh(raceId, sessionType) {
   // Insere novos resultados
   const insertedResults = [];
   for (const r of apiData.results) {
-    const driverId = driverMap[r.driverNumber];
+    // Tenta match por abbreviation primeiro, fallback para driver number
+    const driverId = driverByCode[r.driverCode] || driverByNumber[r.driverNumber];
     if (!driverId) {
-      logger.warn(`Piloto com numero ${r.driverNumber} nao encontrado no banco`);
+      logger.warn(`Piloto ${r.driverCode || r.driverNumber} nao encontrado no banco`);
       continue;
     }
 
