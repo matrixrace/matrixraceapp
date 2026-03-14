@@ -12,6 +12,7 @@ const {
   migrateAbbreviations,
   externalFinalizeRace,
   refreshAllSessions,
+  externalUpdateRace,
   startAutoRefresh,
   stopAutoRefresh,
   getAutoRefreshStatus,
@@ -31,6 +32,7 @@ router.post('/external/races/:id/sessions/:sessionType/update', authenticateApiK
 router.post('/external/migrate-abbreviations', authenticateApiKey, migrateAbbreviations);
 router.post('/external/races/:id/finalize', authenticateApiKey, externalFinalizeRace);
 router.post('/external/races/:id/refresh-all', authenticateApiKey, refreshAllSessions);
+router.patch('/external/races/:id', authenticateApiKey, externalUpdateRace);
 
 // Rotas publicas (autenticadas)
 router.get('/races/:id/sessions', authenticate, getSessionResults);

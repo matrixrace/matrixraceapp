@@ -744,6 +744,52 @@ async function externalFinalizeRace(req, res, next) {
   }
 }
 
+// PATCH /api/v1/live/external/races/:id
+async function externalUpdateRace(req, res, next) {
+  try {
+    const raceId = parseInt(req.params.id);
+    const { isSprintWeekend, sprintQualifyingDate, sprintDate } = req.body;
+
+    const updates = [];
+    const values = [];
+    let idx = 1;
+
+    if (isSprintWeekend !== undefined) {
+      updates.push(`is_sprint_weekend = $${idx++}`);
+      values.push(Boolean(isSprintWeekend));
+    }
+    if (sprintQualifyingDate) {
+      updates.push(`sprint_qualifying_date = $${idx++}`);
+      values.push(new Date(sprintQualifyingDate));
+    }
+    if (sprintDate) {
+      updates.push(`sprint_date = $${idx++}`);
+      values.push(new Date(sprintDate));
+    }
+
+    if (updates.length === 0) {
+      return res.status(400).json({ success: false, message: 'Nenhum campo para atualizar' });
+    }
+
+    updates.push(`updated_at = NOW()`);
+    values.push(raceId);
+
+    const result = await pool.query(
+      `UPDATE races SET ${updates.join(', ')} WHERE id = $${idx} RETURNING id, name, is_sprint_weekend, sprint_qualifying_date, sprint_date`,
+      values
+    );
+
+    if (result.rows.length === 0) {
+      return next(errorResponse('Corrida nao encontrada', 404));
+    }
+
+    logger.info(`Corrida ${result.rows[0].name} atualizada: isSprintWeekend=${result.rows[0].is_sprint_weekend}`);
+    res.json(successResponse(result.rows[0], 'Corrida atualizada'));
+  } catch (error) {
+    next(error);
+  }
+}
+
 // POST /api/v1/live/external/races/:id/refresh-all
 // POST /api/v1/live/admin/races/:id/refresh-all-sessions
 async function refreshAllSessions(req, res, next) {
@@ -899,6 +945,7 @@ module.exports = {
   getExternalRaces,
   externalFinalizeRace,
   refreshAllSessions,
+  externalUpdateRace,
   startAutoRefresh,
   stopAutoRefresh,
   getAutoRefreshStatus,
