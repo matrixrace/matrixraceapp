@@ -158,11 +158,6 @@ class AppRouter {
             const AdminShellScreen(section: 'races'),
       ),
       GoRoute(
-        path: '/admin/results',
-        builder: (context, state) =>
-            const AdminShellScreen(section: 'results'),
-      ),
-      GoRoute(
         path: '/admin/drivers',
         builder: (context, state) =>
             const AdminShellScreen(section: 'drivers'),

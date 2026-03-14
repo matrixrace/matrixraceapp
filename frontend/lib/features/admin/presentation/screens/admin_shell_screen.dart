@@ -4,7 +4,6 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../core/network/api_client.dart';
 import 'admin_dashboard_screen.dart';
 import 'admin_races_screen.dart';
-import 'admin_results_screen.dart';
 import 'admin_drivers_screen.dart';
 import 'admin_teams_screen.dart';
 import 'admin_leagues_screen.dart';
@@ -119,7 +118,6 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
   static const _sections = [
     {'key': 'dashboard', 'label': 'Dashboard',  'icon': Icons.dashboard},
     {'key': 'races',     'label': 'Corridas',   'icon': Icons.flag},
-    {'key': 'results',   'label': 'Resultados', 'icon': Icons.emoji_events},
     {'key': 'live_results', 'label': 'Live',       'icon': Icons.live_tv},
     {'key': 'drivers',   'label': 'Pilotos',    'icon': Icons.person},
     {'key': 'teams',     'label': 'Equipes',    'icon': Icons.groups},
@@ -131,7 +129,6 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
   Widget _buildContent() {
     switch (_currentSection) {
       case 'races':    return const AdminRacesScreen();
-      case 'results':  return const AdminResultsScreen();
       case 'live_results': return const AdminLiveResultsScreen();
       case 'drivers':  return const AdminDriversScreen();
       case 'teams':    return const AdminTeamsScreen();

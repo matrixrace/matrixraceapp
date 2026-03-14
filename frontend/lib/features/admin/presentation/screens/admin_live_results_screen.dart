@@ -291,6 +291,43 @@ class _AdminLiveResultsScreenState extends State<AdminLiveResultsScreen>
     }
   }
 
+  Future<void> _toggleSprint() async {
+    if (_selectedRaceId == null || _raceInfo == null) return;
+    final current = _raceInfo!['isSprintWeekend'] == true;
+    final res = await _api.put('/admin/races/$_selectedRaceId', body: {
+      'isSprintWeekend': !current,
+    });
+    if (!mounted) return;
+    if (res.success) {
+      _showSnack(
+          !current ? 'Sprint Weekend ativado' : 'Sprint Weekend desativado',
+          Colors.orange);
+      // Recarrega dados para atualizar tabs
+      _editingEntries.clear();
+      await _loadSessionData();
+      _loadRaces();
+    } else {
+      _showSnack(res.message ?? 'Erro', Colors.red);
+    }
+  }
+
+  Future<void> _syncSchedule() async {
+    final year = DateTime.now().year;
+    final res =
+        await _api.post('/admin/races/sync-schedule?year=$year');
+    if (!mounted) return;
+    if (res.success) {
+      _showSnack('Calendario $year sincronizado!', Colors.green);
+      _loadRaces();
+      if (_selectedRaceId != null) {
+        _editingEntries.clear();
+        _loadSessionData();
+      }
+    } else {
+      _showSnack(res.message ?? 'Erro ao sincronizar', Colors.red);
+    }
+  }
+
   Future<void> _refreshAllSessions() async {
     if (_selectedRaceId == null) return;
     setState(() => _refreshingAll = true);
@@ -405,12 +442,27 @@ class _AdminLiveResultsScreenState extends State<AdminLiveResultsScreen>
             children: [
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.all(16),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                 color: AppTheme.primaryRed.withValues(alpha: 0.1),
-                child: const Text('Selecione a Corrida',
-                    style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: AppTheme.primaryRed)),
+                child: Row(
+                  children: [
+                    const Expanded(
+                      child: Text('Selecione a Corrida',
+                          style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: AppTheme.primaryRed)),
+                    ),
+                    IconButton(
+                      onPressed: _syncSchedule,
+                      icon: const Icon(Icons.sync, size: 18),
+                      tooltip: 'Sincronizar calendario F1',
+                      color: AppTheme.primaryRed,
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                    ),
+                  ],
+                ),
               ),
               Expanded(
                 child: _loadingRaces
@@ -485,19 +537,45 @@ class _AdminLiveResultsScreenState extends State<AdminLiveResultsScreen>
                   style: const TextStyle(
                       fontSize: 16, fontWeight: FontWeight.bold)),
               const SizedBox(width: 8),
-              if (_raceInfo?['isSprintWeekend'] == true)
-                Container(
+              // Sprint toggle
+              GestureDetector(
+                onTap: _toggleSprint,
+                child: Container(
                   padding:
                       const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                   decoration: BoxDecoration(
-                      color: Colors.orange.withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(4)),
-                  child: const Text('SPRINT',
-                      style: TextStyle(
-                          fontSize: 10,
-                          color: Colors.orange,
-                          fontWeight: FontWeight.bold)),
+                      color: _raceInfo?['isSprintWeekend'] == true
+                          ? Colors.orange.withValues(alpha: 0.2)
+                          : Colors.grey.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(4),
+                      border: Border.all(
+                          color: _raceInfo?['isSprintWeekend'] == true
+                              ? Colors.orange
+                              : Colors.grey,
+                          width: 0.5)),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.bolt,
+                          size: 12,
+                          color: _raceInfo?['isSprintWeekend'] == true
+                              ? Colors.orange
+                              : Colors.grey),
+                      const SizedBox(width: 4),
+                      Text(
+                          _raceInfo?['isSprintWeekend'] == true
+                              ? 'SPRINT'
+                              : 'Normal',
+                          style: TextStyle(
+                              fontSize: 10,
+                              color: _raceInfo?['isSprintWeekend'] == true
+                                  ? Colors.orange
+                                  : Colors.grey,
+                              fontWeight: FontWeight.bold)),
+                    ],
+                  ),
                 ),
+              ),
               if (_raceInfo?['isCompleted'] == true) ...[
                 const SizedBox(width: 8),
                 Container(
