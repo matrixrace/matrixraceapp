@@ -26,7 +26,8 @@ async function globalRanking(req, res, next) {
 async function leagueRanking(req, res, next) {
   try {
     const { leagueId } = req.params;
-    const ranking = await getLeagueRanking(leagueId);
+    const result = await getLeagueRanking(leagueId);
+    const ranking = result.ranking;
 
     // Enriquece com podiumStats
     const userIds = ranking.map(r => r.userId);
@@ -35,7 +36,12 @@ async function leagueRanking(req, res, next) {
       entry.podiumStats = podium[entry.userId] || { gold: 0, silver: 0, bronze: 0 };
     }
 
-    res.json(successResponse(ranking));
+    res.json(successResponse({
+      ranking,
+      activeRace: result.activeRace,
+      activeSessionType: result.activeSessionType,
+      isFinalized: result.isFinalized,
+    }));
   } catch (error) {
     next(error);
   }

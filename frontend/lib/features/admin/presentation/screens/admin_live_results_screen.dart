@@ -697,7 +697,7 @@ class _AdminLiveResultsScreenState extends State<AdminLiveResultsScreen>
                                 const Text('Parar Auto-Refresh'),
                                 if (_autoRefreshLastRefresh != null)
                                   Text(
-                                    '${_autoRefreshSource == 'scheduler' ? '[Auto] ' : ''}Ultimo: ${_formatTime(_autoRefreshLastRefresh!)}${_autoRefreshErrorCount > 0 ? ' (${_autoRefreshErrorCount} erros)' : ''}',
+                                    '${_autoRefreshSource == 'scheduler' ? '[Auto] ' : ''}Ultimo: ${_formatTime(_autoRefreshLastRefresh!)}${_autoRefreshErrorCount > 0 ? ' ($_autoRefreshErrorCount erros)' : ''}',
                                     style: const TextStyle(fontSize: 9),
                                   ),
                               ],

@@ -426,6 +426,13 @@ async function getLeagueLiveScoring(req, res, next) {
     const raceId = parseInt(req.params.id);
     const leagueId = req.params.leagueId;
 
+    // Busca dados da corrida (para checar deadlines)
+    const [race] = await db.select().from(races).where(eq(races.id, raceId)).limit(1);
+    if (!race) return next(errorResponse('Corrida nao encontrada', 404));
+
+    const now = new Date();
+    const isRaceFinalized = race.isCompleted === true;
+
     // Busca a ultima sessao atualizada
     const lastSession = await pool.query(
       `SELECT DISTINCT session_type, MAX(updated_at) as last_update
@@ -434,73 +441,107 @@ async function getLeagueLiveScoring(req, res, next) {
       [raceId]
     );
 
-    if (lastSession.rows.length === 0) {
-      return res.json(successResponse({ sessionType: null, ranking: [] }));
+    const sessionType = lastSession.rows.length > 0 ? lastSession.rows[0].session_type : null;
+
+    // Busca posicoes atuais (da ultima sessao)
+    const actualPositions = {};
+    if (sessionType) {
+      const positionsRes = await pool.query(
+        'SELECT driver_id, position FROM session_results WHERE race_id = $1 AND session_type = $2',
+        [raceId, sessionType]
+      );
+      for (const r of positionsRes.rows) {
+        actualPositions[r.driver_id] = r.position;
+      }
     }
 
-    const sessionType = lastSession.rows[0].session_type;
-
-    // Busca posicoes atuais
-    const positionsRes = await pool.query(
-      'SELECT driver_id, position FROM session_results WHERE race_id = $1 AND session_type = $2',
-      [raceId, sessionType]
+    // Busca TODOS os membros da liga (nao so quem aplicou)
+    const allMembers = await pool.query(
+      `SELECT lm.user_id, u.display_name, u.avatar_url, lm.joined_at
+       FROM league_members lm
+       JOIN users u ON u.id = lm.user_id
+       WHERE lm.league_id = $1 AND lm.status = 'active' AND u.is_admin = false`,
+      [leagueId]
     );
 
-    const actualPositions = {};
-    for (const r of positionsRes.rows) {
-      actualPositions[r.driver_id] = r.position;
-    }
-
-    // Busca membros da liga que aplicaram palpite nesta corrida
-    const members = await pool.query(
-      `SELECT pa.user_id, u.display_name, u.avatar_url
-       FROM prediction_applications pa
-       JOIN users u ON u.id = pa.user_id
-       WHERE pa.league_id = $1 AND pa.race_id = $2`,
+    // Verifica quem aplicou palpite nesta liga/corrida
+    const applicants = await pool.query(
+      `SELECT user_id FROM prediction_applications WHERE league_id = $1 AND race_id = $2`,
       [leagueId, raceId]
     );
+    const appliedSet = new Set(applicants.rows.map(r => r.user_id));
 
-    // Calcula pontuacao provisoria de cada membro
+    // Deadlines por lock_type
+    const deadlines = {
+      fp1: race.fp1Date ? new Date(race.fp1Date) : null,
+      qualifying: race.qualifyingDate ? new Date(race.qualifyingDate) : null,
+      race: race.raceDate ? new Date(race.raceDate) : null,
+    };
+
+    // Calcula pontuacao de cada membro
     const ranking = [];
-    for (const member of members.rows) {
-      const preds = await pool.query(
-        `SELECT driver_id, predicted_position, max_points_per_driver
-         FROM predictions WHERE race_id = $1 AND user_id = $2`,
-        [raceId, member.user_id]
-      );
-
-      let provisionalPoints = 0;
-      for (const pred of preds.rows) {
-        const actualPos = actualPositions[pred.driver_id];
-        if (actualPos !== undefined) {
-          provisionalPoints += calculatePoints(pred.predicted_position, actualPos, pred.max_points_per_driver);
-        }
-      }
-
-      // Busca pontos oficiais de corridas anteriores nesta liga
+    for (const member of allMembers.rows) {
+      // Pontos oficiais de corridas anteriores nesta liga
       const officialScores = await pool.query(
         `SELECT COALESCE(SUM(points), 0) as total
          FROM scores WHERE league_id = $1 AND user_id = $2`,
         [leagueId, member.user_id]
       );
+      const officialPoints = parseInt(officialScores.rows[0].total, 10);
+
+      let provisionalPoints = 0;
+      let lockType = null;
+      let deadlinePassed = false;
+
+      // So calcula provisorio se: aplicou palpite E ha posicoes de sessao
+      if (appliedSet.has(member.user_id) && sessionType) {
+        const preds = await pool.query(
+          `SELECT driver_id, predicted_position, max_points_per_driver, lock_type
+           FROM predictions WHERE race_id = $1 AND user_id = $2`,
+          [raceId, member.user_id]
+        );
+
+        if (preds.rows.length > 0) {
+          lockType = preds.rows[0].lock_type || 'race';
+          const deadline = deadlines[lockType];
+          deadlinePassed = deadline ? now >= deadline : false;
+
+          // So mostra pontos se o deadline do user ja passou
+          if (deadlinePassed) {
+            for (const pred of preds.rows) {
+              const actualPos = actualPositions[pred.driver_id];
+              if (actualPos !== undefined) {
+                provisionalPoints += calculatePoints(
+                  pred.predicted_position, actualPos, pred.max_points_per_driver
+                );
+              }
+            }
+          }
+        }
+      }
 
       ranking.push({
         userId: member.user_id,
         displayName: member.display_name || 'Anonimo',
         avatarUrl: member.avatar_url,
         provisionalPoints,
-        officialPoints: parseInt(officialScores.rows[0].total, 10),
-        totalPoints: parseInt(officialScores.rows[0].total, 10) + provisionalPoints,
+        officialPoints,
+        totalPoints: officialPoints + provisionalPoints,
+        lockType,
+        deadlinePassed,
+        hasPrediction: appliedSet.has(member.user_id),
+        joinedAt: member.joined_at,
       });
     }
 
-    // Ordena por totalPoints desc
-    ranking.sort((a, b) => b.totalPoints - a.totalPoints);
+    // Ordena por totalPoints desc, desempate por joined_at asc
+    ranking.sort((a, b) => b.totalPoints - a.totalPoints || new Date(a.joinedAt) - new Date(b.joinedAt));
     ranking.forEach((r, i) => { r.position = i + 1; });
 
     res.json(successResponse({
       sessionType,
-      updatedAt: lastSession.rows[0].last_update,
+      updatedAt: lastSession.rows.length > 0 ? lastSession.rows[0].last_update : null,
+      isFinalized: isRaceFinalized,
       ranking,
     }));
   } catch (error) {

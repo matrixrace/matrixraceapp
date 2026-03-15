@@ -108,8 +108,9 @@ async function calculateRaceScores(raceId) {
   };
 }
 
-// Ranking geral de uma liga (soma de todas as corridas)
+// Ranking geral de uma liga (soma de todas as corridas + provisorio da corrida ativa)
 async function getLeagueRanking(leagueId) {
+  // Busca ranking oficial
   const result = await pool.query(
     `SELECT
       u.id,
@@ -127,15 +128,109 @@ async function getLeagueRanking(leagueId) {
     [leagueId]
   );
 
-  return result.rows.map((row, index) => ({
-    position: index + 1,
-    userId: row.id,
-    displayName: row.display_name || 'Anônimo',
-    avatarUrl: row.avatar_url,
-    totalPoints: parseInt(row.total_points, 10),
-    racesPlayed: parseInt(row.races_played, 10),
-    joinedAt: row.joined_at,
-  }));
+  // Busca corrida ativa desta liga (proxima nao finalizada com session_results)
+  const activeRaceRes = await pool.query(
+    `SELECT r.id, r.name, r.is_completed, r.fp1_date, r.qualifying_date, r.race_date
+     FROM league_races lr
+     JOIN races r ON r.id = lr.race_id
+     WHERE lr.league_id = $1 AND r.is_completed = false
+     AND EXISTS (SELECT 1 FROM session_results sr WHERE sr.race_id = r.id)
+     ORDER BY r.race_date ASC LIMIT 1`,
+    [leagueId]
+  );
+
+  const activeRace = activeRaceRes.rows[0] || null;
+  let provisionalData = {};
+  let activeSessionType = null;
+
+  if (activeRace) {
+    const now = new Date();
+    const deadlines = {
+      fp1: activeRace.fp1_date ? new Date(activeRace.fp1_date) : null,
+      qualifying: activeRace.qualifying_date ? new Date(activeRace.qualifying_date) : null,
+      race: activeRace.race_date ? new Date(activeRace.race_date) : null,
+    };
+
+    // Busca ultima sessao atualizada
+    const lastSession = await pool.query(
+      `SELECT session_type FROM session_results WHERE race_id = $1
+       ORDER BY updated_at DESC LIMIT 1`,
+      [activeRace.id]
+    );
+    activeSessionType = lastSession.rows[0]?.session_type || null;
+
+    // Busca posicoes atuais
+    const actualPositions = {};
+    if (activeSessionType) {
+      const posRes = await pool.query(
+        'SELECT driver_id, position FROM session_results WHERE race_id = $1 AND session_type = $2',
+        [activeRace.id, activeSessionType]
+      );
+      for (const r of posRes.rows) actualPositions[r.driver_id] = r.position;
+    }
+
+    // Para cada membro da liga, calcula pontuacao provisoria
+    for (const row of result.rows) {
+      // Verifica se aplicou palpite
+      const appRes = await pool.query(
+        `SELECT 1 FROM prediction_applications WHERE league_id = $1 AND race_id = $2 AND user_id = $3`,
+        [leagueId, activeRace.id, row.id]
+      );
+      if (appRes.rows.length === 0) continue;
+
+      // Busca palpites
+      const preds = await pool.query(
+        `SELECT driver_id, predicted_position, max_points_per_driver, lock_type
+         FROM predictions WHERE race_id = $1 AND user_id = $2`,
+        [activeRace.id, row.id]
+      );
+      if (preds.rows.length === 0) continue;
+
+      const lockType = preds.rows[0].lock_type || 'race';
+      const deadline = deadlines[lockType];
+      const deadlinePassed = deadline ? now >= deadline : false;
+
+      if (!deadlinePassed) continue; // Deadline nao passou, nao mostra pontos
+
+      let provPoints = 0;
+      for (const pred of preds.rows) {
+        const actualPos = actualPositions[pred.driver_id];
+        if (actualPos !== undefined) {
+          provPoints += calculatePoints(pred.predicted_position, actualPos, pred.max_points_per_driver);
+        }
+      }
+
+      provisionalData[row.id] = { provisionalPoints: provPoints, lockType };
+    }
+  }
+
+  const ranked = result.rows.map((row) => {
+    const prov = provisionalData[row.id];
+    const officialPoints = parseInt(row.total_points, 10);
+    const provisionalPoints = prov ? prov.provisionalPoints : 0;
+    return {
+      userId: row.id,
+      displayName: row.display_name || 'Anônimo',
+      avatarUrl: row.avatar_url,
+      officialPoints,
+      provisionalPoints,
+      totalPoints: officialPoints + provisionalPoints,
+      racesPlayed: parseInt(row.races_played, 10),
+      joinedAt: row.joined_at,
+      lockType: prov?.lockType || null,
+    };
+  });
+
+  // Re-ordena com provisorios inclusos
+  ranked.sort((a, b) => b.totalPoints - a.totalPoints || new Date(a.joinedAt) - new Date(b.joinedAt));
+  ranked.forEach((r, i) => { r.position = i + 1; });
+
+  return {
+    ranking: ranked,
+    activeRace: activeRace ? { id: activeRace.id, name: activeRace.name } : null,
+    activeSessionType,
+    isFinalized: activeRace?.is_completed || false,
+  };
 }
 
 // Ranking global (pontuação por GP, deduplicada entre ligas)
