@@ -206,16 +206,22 @@ async function fetchSessionData(year, round, sessionType, countryCode, raceName)
 
   // Monta resultado formatado
   const formattedResults = sessionResults.map((r) => {
-    let gap = formatGap(r.gap_to_leader);
+    let gap = null;
 
-    // Para qualifying: calcular gap a partir dos tempos individuais
-    if (isQualifying && r.time && leaderTime) {
+    if (r.position === 1) {
+      gap = 'LEADER';
+    } else if (isQualifying && r.time && leaderTime) {
+      // Para qualifying: calcular gap a partir dos tempos individuais
       const driverTime = parseTimeToSeconds(r.time);
-      if (driverTime && r.position === 1) {
-        gap = 'LEADER';
-      } else if (driverTime) {
+      if (driverTime) {
         gap = '+' + (driverTime - leaderTime).toFixed(3);
       }
+    } else if (r.gap_to_leader !== null && r.gap_to_leader !== undefined && r.gap_to_leader !== 0) {
+      // Gap normal da API (corridas/sprints) — ignora gap=0 para nao-lideres
+      gap = formatGap(r.gap_to_leader);
+    } else if (r.time && r.position > 1) {
+      // Fallback: usa o campo time como gap string (ex: "+5.515")
+      gap = r.time.startsWith('+') ? r.time : null;
     }
 
     return {

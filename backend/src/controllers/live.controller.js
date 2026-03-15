@@ -50,8 +50,9 @@ async function doSessionRefresh(raceId, sessionType) {
     [raceId, sessionType]
   );
 
-  // Insere novos resultados
+  // Insere novos resultados (garante posicoes unicas)
   const insertedResults = [];
+  const usedPositions = new Set();
   for (const r of apiData.results) {
     // Tenta match por abbreviation primeiro, fallback para driver number
     const driverId = driverByCode[r.driverCode] || driverByNumber[r.driverNumber];
@@ -60,16 +61,26 @@ async function doSessionRefresh(raceId, sessionType) {
       continue;
     }
 
+    // Garante posicao unica — se duplicada, atribui proxima disponivel
+    let position = r.position || 0;
+    if (position === 0 || usedPositions.has(position)) {
+      // Posicao invalida ou duplicada: encontra proxima disponivel
+      let next = position || insertedResults.length + 1;
+      while (usedPositions.has(next)) next++;
+      position = next;
+    }
+    usedPositions.add(position);
+
     await pool.query(
       `INSERT INTO session_results (race_id, session_type, driver_id, position, best_lap_time, gap, tire_compound, pit_stops, status, updated_at)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())`,
-      [raceId, sessionType, driverId, r.position, r.bestLapTime, r.gap, r.tireCompound, r.pitStops, r.status]
+      [raceId, sessionType, driverId, position, r.bestLapTime, r.gap, r.tireCompound, r.pitStops, r.status]
     );
 
     insertedResults.push({
       driverId,
       driverNumber: r.driverNumber,
-      position: r.position,
+      position,
       bestLapTime: r.bestLapTime,
       gap: r.gap,
       tireCompound: r.tireCompound,
@@ -203,13 +214,30 @@ async function finalizeRaceResults(req, res, next) {
       return next(errorResponse('Nenhum resultado de corrida encontrado. Atualize a sessao "race" primeiro.', 400));
     }
 
+    // Verifica e corrige posicoes duplicadas
+    const seenPositions = new Set();
+    const validResults = [];
+    for (const r of sessionRes.rows) {
+      if (seenPositions.has(r.position)) {
+        logger.warn(`[Finalize] Posicao duplicada ${r.position} para driver_id=${r.driver_id} — atribuindo proxima posicao`);
+        // Encontra a proxima posicao disponivel
+        let nextPos = r.position;
+        while (seenPositions.has(nextPos)) nextPos++;
+        seenPositions.add(nextPos);
+        validResults.push({ driverId: r.driver_id, position: nextPos });
+      } else {
+        seenPositions.add(r.position);
+        validResults.push({ driverId: r.driver_id, position: r.position });
+      }
+    }
+
     // Remove race_results anteriores
     await db.delete(raceResults).where(eq(raceResults.raceId, raceId));
 
-    // Copia session_results -> race_results
-    const values = sessionRes.rows.map((r) => ({
+    // Copia session_results -> race_results (com posicoes corrigidas)
+    const values = validResults.map((r) => ({
       raceId,
-      driverId: r.driver_id,
+      driverId: r.driverId,
       position: r.position,
     }));
     await db.insert(raceResults).values(values);
@@ -769,10 +797,18 @@ async function externalFinalizeRace(req, res, next) {
       return res.status(400).json({ success: false, message: 'Nenhum resultado de corrida. Importe a sessao "race" primeiro.' });
     }
 
-    await db.delete(raceResults).where(eq(raceResults.raceId, raceId));
+    // Corrige posicoes duplicadas
+    const seenPositions = new Set();
+    const validResults = [];
+    for (const r of sessionRes.rows) {
+      let pos = r.position;
+      while (seenPositions.has(pos)) pos++;
+      seenPositions.add(pos);
+      validResults.push({ raceId, driverId: r.driver_id, position: pos });
+    }
 
-    const values = sessionRes.rows.map((r) => ({ raceId, driverId: r.driver_id, position: r.position }));
-    await db.insert(raceResults).values(values);
+    await db.delete(raceResults).where(eq(raceResults.raceId, raceId));
+    await db.insert(raceResults).values(validResults);
 
     await db.update(races).set({ isCompleted: true, updatedAt: new Date() }).where(eq(races.id, raceId));
 
