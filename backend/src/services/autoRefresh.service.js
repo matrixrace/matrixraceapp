@@ -3,6 +3,14 @@ const { pool } = require('../config/database');
 const { getIo } = require('../config/socket');
 
 const MAX_CONSECUTIVE_ERRORS = 10;
+// Erros transitorios que NAO devem contar para o limite de parada
+const TRANSIENT_ERROR_PATTERNS = [
+  'nao ter acontecido ainda',
+  'Nenhum resultado encontrado',
+  'Nenhum resultado para',
+  'Timeout ao chamar',
+  'Falha ao parsear resposta',
+];
 
 let _intervalHandle = null;
 let _state = {
@@ -11,9 +19,12 @@ let _state = {
   sessionType: null,
   intervalMs: 30000,
   errorCount: 0,
+  transientErrorCount: 0,
   lastRefresh: null,
   lastError: null,
   source: null, // 'manual' | 'scheduler'
+  startedAt: null,
+  successCount: 0,
 };
 
 // Persiste estado no system_settings
@@ -38,6 +49,11 @@ async function persistState() {
   }
 }
 
+// Verifica se o erro eh transitorio (API sem dados ainda, timeout, etc)
+function isTransientError(message) {
+  return TRANSIENT_ERROR_PATTERNS.some(pattern => message.includes(pattern));
+}
+
 // Executa um ciclo de refresh
 async function doRefreshCycle() {
   if (!_state.active || !_state.raceId || !_state.sessionType) return;
@@ -48,27 +64,38 @@ async function doRefreshCycle() {
     const result = await doSessionRefresh(_state.raceId, _state.sessionType);
 
     _state.errorCount = 0;
+    _state.transientErrorCount = 0;
     _state.lastRefresh = new Date().toISOString();
     _state.lastError = null;
+    _state.successCount++;
 
     logger.info(`[AutoRefresh] OK: ${result.count} pilotos atualizados (race=${_state.raceId}, session=${_state.sessionType})`);
   } catch (err) {
-    _state.errorCount++;
     _state.lastError = err.message;
-    logger.error(`[AutoRefresh] Erro #${_state.errorCount}: ${err.message}`);
 
-    // Para automaticamente apos muitos erros consecutivos
-    if (_state.errorCount >= MAX_CONSECUTIVE_ERRORS) {
-      logger.error(`[AutoRefresh] ${MAX_CONSECUTIVE_ERRORS} erros consecutivos — parando automaticamente`);
-      await stop();
+    if (isTransientError(err.message)) {
+      // Erro transitorio: a sessao pode nao ter comecado ou API indisponivel temporariamente
+      _state.transientErrorCount++;
+      logger.warn(`[AutoRefresh] Erro transitorio #${_state.transientErrorCount}: ${err.message}`);
+      // NAO conta para o limite de parada — o scheduler vai continuar tentando
+    } else {
+      // Erro real (problema de rede, banco, matching de drivers, etc)
+      _state.errorCount++;
+      logger.error(`[AutoRefresh] Erro #${_state.errorCount}: ${err.message}`);
 
-      // Notifica admin via socket
-      const io = getIo();
-      if (io) {
-        io.emit('auto_refresh_stopped', {
-          reason: `${MAX_CONSECUTIVE_ERRORS} erros consecutivos`,
-          lastError: err.message,
-        });
+      // Para automaticamente apos muitos erros reais consecutivos
+      if (_state.errorCount >= MAX_CONSECUTIVE_ERRORS) {
+        logger.error(`[AutoRefresh] ${MAX_CONSECUTIVE_ERRORS} erros reais consecutivos — parando automaticamente`);
+        await stop();
+
+        // Notifica admin via socket
+        const io = getIo();
+        if (io) {
+          io.emit('auto_refresh_stopped', {
+            reason: `${MAX_CONSECUTIVE_ERRORS} erros reais consecutivos`,
+            lastError: err.message,
+          });
+        }
       }
     }
   }
@@ -87,9 +114,12 @@ async function start(raceId, sessionType, intervalMs = 30000, source = 'manual')
     sessionType,
     intervalMs,
     errorCount: 0,
+    transientErrorCount: 0,
     lastRefresh: null,
     lastError: null,
     source,
+    startedAt: new Date().toISOString(),
+    successCount: 0,
   };
 
   await persistState();

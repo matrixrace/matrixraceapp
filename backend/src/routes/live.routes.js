@@ -43,6 +43,10 @@ router.get('/races/:id/live-scoring/league/:leagueId', authenticate, getLeagueLi
 router.post('/admin/auto-refresh/start', authenticate, requireAdmin, startAutoRefresh);
 router.post('/admin/auto-refresh/stop', authenticate, requireAdmin, stopAutoRefresh);
 router.get('/admin/auto-refresh/status', authenticate, requireAdmin, getAutoRefreshStatus);
+router.get('/admin/scheduler/diagnostics', authenticate, requireAdmin, (req, res) => {
+  const sessionScheduler = require('../services/sessionScheduler.service');
+  res.json({ success: true, data: sessionScheduler.getDiagnostics() });
+});
 router.post('/admin/races/:id/sessions/:sessionType/refresh', authenticate, requireAdmin, refreshSessionFromAPI);
 router.post('/admin/races/:id/sessions/:sessionType/manual', authenticate, requireAdmin, validate(manualSessionResultsSchema), manualSessionResults);
 router.post('/admin/races/:id/finalize-results', authenticate, requireAdmin, finalizeRaceResults);
