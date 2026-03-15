@@ -197,26 +197,57 @@ async function fetchSessionData(year, round, sessionType, countryCode, raceName)
     throw new Error('Nenhum resultado para ' + sessionName + ' em ' + meeting.country + '. A sessao pode nao ter acontecido ainda.');
   }
 
+  // Sessoes de qualifying: calcular gap relativo ao P1 a partir dos tempos
+  const isQualifying = sessionName.includes('Qualifying');
+  let leaderTime = null;
+  if (isQualifying && sessionResults.length > 0) {
+    leaderTime = parseTimeToSeconds(sessionResults[0].time);
+  }
+
   // Monta resultado formatado
-  const formattedResults = sessionResults.map((r) => ({
-    driverNumber: r.driver_season?.driver?.driver_number || null,
-    position: r.position,
-    bestLapTime: r.time || null,
-    gap: formatGap(r.gap_to_leader),
-    tireCompound: null,
-    pitStops: 0,
-    status: r.completion_status_code || null,
-    driverCode: r.driver_season?.driver?.code || null,
-    driverName: r.driver_name || null,
-    teamName: r.team_name || null,
-    laps: r.laps || null,
-    points: r.points || null,
-  }));
+  const formattedResults = sessionResults.map((r) => {
+    let gap = formatGap(r.gap_to_leader);
+
+    // Para qualifying: calcular gap a partir dos tempos individuais
+    if (isQualifying && r.time && leaderTime) {
+      const driverTime = parseTimeToSeconds(r.time);
+      if (driverTime && r.position === 1) {
+        gap = 'LEADER';
+      } else if (driverTime) {
+        gap = '+' + (driverTime - leaderTime).toFixed(3);
+      }
+    }
+
+    return {
+      driverNumber: r.driver_season?.driver?.driver_number || null,
+      position: r.position,
+      bestLapTime: r.time || null,
+      gap,
+      tireCompound: null,
+      pitStops: 0,
+      status: r.completion_status_code || null,
+      driverCode: r.driver_season?.driver?.code || null,
+      driverName: r.driver_name || null,
+      teamName: r.team_name || null,
+      laps: r.laps || null,
+      points: r.points || null,
+    };
+  });
 
   let raceControl = [];
 
   logger.info('Sessao ' + sessionName + ' de ' + meeting.country + ': ' + formattedResults.length + ' pilotos');
   return { results: formattedResults, raceControl };
+}
+
+// Converte string de tempo "M:SS.mmm" para segundos
+function parseTimeToSeconds(timeStr) {
+  if (!timeStr) return null;
+  const parts = timeStr.split(':');
+  if (parts.length === 2) {
+    return parseInt(parts[0]) * 60 + parseFloat(parts[1]);
+  }
+  return parseFloat(timeStr) || null;
 }
 
 // Formata duracao em segundos para "M:SS.mmm"
