@@ -147,14 +147,19 @@ class _PlacarTabState extends State<PlacarTab>
                   fontWeight: FontWeight.w600),
             ),
           ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-            decoration: BoxDecoration(
-              color: Colors.orange.withValues(alpha: 0.2),
-              borderRadius: BorderRadius.circular(4),
+          Tooltip(
+            message:
+                'Pontuação calculada com base nos resultados parciais.\nSerá atualizada ao final da corrida.',
+            child: Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: Colors.orange.withValues(alpha: 0.2),
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: const Text('Pts Provisórios',
+                  style: TextStyle(fontSize: 9, color: Colors.orange)),
             ),
-            child: const Text('Pts Provisórios',
-                style: TextStyle(fontSize: 9, color: Colors.orange)),
           ),
         ],
       ),
@@ -246,47 +251,7 @@ class _PlacarTabState extends State<PlacarTab>
 
   Widget _buildPointsColumn(
       int total, int official, int provisional, int position) {
-    if (provisional > 0 && _activeRace != null) {
-      // Mostra total com badge provisório
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.baseline,
-            textBaseline: TextBaseline.alphabetic,
-            children: [
-              Text(
-                '$total',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.orange,
-                ),
-              ),
-              const SizedBox(width: 3),
-              const Text('pts',
-                  style: TextStyle(
-                      fontSize: 11, color: AppTheme.textSecondary)),
-            ],
-          ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-            decoration: BoxDecoration(
-              color: Colors.orange.withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(4),
-            ),
-            child: Text(
-              '+$provisional prov.',
-              style:
-                  const TextStyle(fontSize: 9, color: Colors.orange),
-            ),
-          ),
-        ],
-      );
-    }
-
-    // Pontuação oficial (sem provisório)
+    final isProvisional = provisional > 0 && _activeRace != null;
     return Row(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.baseline,
@@ -297,9 +262,11 @@ class _PlacarTabState extends State<PlacarTab>
           style: TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.bold,
-            color: position <= 3
-                ? _medalColor(position)
-                : AppTheme.textPrimary,
+            color: isProvisional
+                ? Colors.orange
+                : position <= 3
+                    ? _medalColor(position)
+                    : AppTheme.textPrimary,
           ),
         ),
         const SizedBox(width: 3),
