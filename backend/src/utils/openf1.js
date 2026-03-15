@@ -63,7 +63,14 @@ function fetchAPI(path) {
   logger.info('F1Dashboard API request: ' + url);
 
   return new Promise((resolve, reject) => {
-    https.get(url, { timeout: 30000 }, (resp) => {
+    const options = {
+      timeout: 30000,
+      headers: {
+        'User-Agent': 'MatrixRace/1.0',
+        'Accept': 'application/json',
+      },
+    };
+    https.get(url, options, (resp) => {
       let data = '';
       resp.on('data', (chunk) => { data += chunk; });
       resp.on('end', () => {
