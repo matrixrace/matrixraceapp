@@ -285,7 +285,7 @@ class _LoginScreenState extends State<LoginScreen>
       child: Container(
         color: AppTheme.darkBackground,
         child: CustomPaint(
-          painter: _CheckeredFlagPainter(),
+          painter: _CarbonFiberPainter(),
         ),
       ),
     );
@@ -323,45 +323,68 @@ class _LoginScreenState extends State<LoginScreen>
   }
 }
 
-/// Padrão de bandeira quadriculada (checkered flag) sutil no fundo
-class _CheckeredFlagPainter extends CustomPainter {
+/// Padrão de fibra de carbono — twill 2x2 diagonal
+class _CarbonFiberPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
-    const cellSize = 40.0;
-    final darkPaint = Paint()..color = const Color(0xFF0A0E17);
-    final lightPaint = Paint()..color = const Color(0xFF0E1320);
+    // Fundo base
+    canvas.drawRect(
+      Rect.fromLTWH(0, 0, size.width, size.height),
+      Paint()..color = const Color(0xFF0A0D14),
+    );
 
-    final cols = (size.width / cellSize).ceil() + 1;
-    final rows = (size.height / cellSize).ceil() + 1;
+    // Cada "célula" da fibra de carbono é um quadrado pequeno
+    // com dois tons alternados em padrão diagonal (twill weave)
+    const cell = 12.0;
+    const half = cell / 2;
+
+    final dark1 = Paint()..color = const Color(0xFF0D1018);
+    final dark2 = Paint()..color = const Color(0xFF10141E);
+    final highlight = Paint()..color = const Color(0xFF151A26);
+
+    final cols = (size.width / cell).ceil() + 1;
+    final rows = (size.height / cell).ceil() + 1;
 
     for (int row = 0; row < rows; row++) {
       for (int col = 0; col < cols; col++) {
-        final isLight = (row + col) % 2 == 0;
-        canvas.drawRect(
-          Rect.fromLTWH(col * cellSize, row * cellSize, cellSize, cellSize),
-          isLight ? lightPaint : darkPaint,
-        );
+        final x = col * cell;
+        final y = row * cell;
+        // Padrão twill: alterna em diagonal
+        final diag = (row + col) % 4;
+
+        if (diag == 0 || diag == 1) {
+          // Feixe horizontal
+          canvas.drawRect(Rect.fromLTWH(x, y, cell, half), highlight);
+          canvas.drawRect(Rect.fromLTWH(x, y + half, cell, half), dark1);
+        } else {
+          // Feixe vertical
+          canvas.drawRect(Rect.fromLTWH(x, y, cell, half), dark2);
+          canvas.drawRect(Rect.fromLTWH(x, y + half, cell, half), dark1);
+        }
       }
     }
 
-    // Fade para escuro nas bordas inferior e superior para não competir com o conteúdo
-    final fadeTop = Paint()
+    // Linhas de separação entre feixes (sulcos da trama)
+    final groovePaint = Paint()
+      ..color = const Color(0xFF080B12)
+      ..strokeWidth = 0.5;
+
+    for (double x = 0; x <= size.width; x += cell) {
+      canvas.drawLine(Offset(x, 0), Offset(x, size.height), groovePaint);
+    }
+    for (double y = 0; y <= size.height; y += cell) {
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), groovePaint);
+    }
+
+    // Reflexo sutil no topo (como se a luz batesse no carbono)
+    final sheen = Paint()
       ..shader = const LinearGradient(
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
-        colors: [Color(0xFF080B12), Color(0x00080B12)],
-        stops: [0.0, 0.15],
+        colors: [Color(0x12FFFFFF), Color(0x00FFFFFF)],
+        stops: [0.0, 0.25],
       ).createShader(Rect.fromLTWH(0, 0, size.width, size.height));
-    canvas.drawRect(Rect.fromLTWH(0, 0, size.width, size.height), fadeTop);
-
-    final fadeBottom = Paint()
-      ..shader = LinearGradient(
-        begin: Alignment.topCenter,
-        end: Alignment.bottomCenter,
-        colors: [const Color(0x00080B12), const Color(0xFF080B12)],
-        stops: const [0.7, 1.0],
-      ).createShader(Rect.fromLTWH(0, 0, size.width, size.height));
-    canvas.drawRect(Rect.fromLTWH(0, 0, size.width, size.height), fadeBottom);
+    canvas.drawRect(Rect.fromLTWH(0, 0, size.width, size.height), sheen);
   }
 
   @override
