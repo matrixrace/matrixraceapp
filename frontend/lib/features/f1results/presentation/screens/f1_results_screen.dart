@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/tutorial/tutorial_bloc.dart';
 import '../../../../core/tutorial/tutorial_step.dart';
+import '../../../../shared/widgets/loading_shimmer.dart';
+import '../../../../shared/widgets/empty_state_widget.dart';
+import '../../../../shared/widgets/api_error_widget.dart';
 
 /// Tela de Histórico Esportivo de F1
 /// Seções: GPs (resultados por corrida), Pilotos (standings), Construtores (standings)
@@ -33,7 +37,6 @@ class _F1ResultsScreenState extends State<F1ResultsScreen> {
     _loadAll();
   }
 
-  // Carrega os 3 conjuntos de dados em paralelo
   Future<void> _loadAll() async {
     setState(() {
       _isLoading = true;
@@ -49,7 +52,6 @@ class _F1ResultsScreenState extends State<F1ResultsScreen> {
 
       if (!mounted) return;
 
-      // Verifica se ao menos um falhou
       final failed = results.where((r) => !r.success).toList();
       if (failed.isNotEmpty && results[0].data == null) {
         setState(() {
@@ -93,7 +95,6 @@ class _F1ResultsScreenState extends State<F1ResultsScreen> {
     );
   }
 
-  // ── Cabeçalho: dropdown de ano + botões de seção ──────────────
   Widget _buildHeader() {
     return Container(
       key: TutorialKeys.f1Tabs,
@@ -101,7 +102,6 @@ class _F1ResultsScreenState extends State<F1ResultsScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       child: Row(
         children: [
-          // Dropdown de ano
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
             decoration: BoxDecoration(
@@ -135,7 +135,6 @@ class _F1ResultsScreenState extends State<F1ResultsScreen> {
             ),
           ),
           const SizedBox(width: 12),
-          // Botões de seção
           Expanded(
             child: Row(
               mainAxisAlignment: MainAxisAlignment.end,
@@ -168,27 +167,15 @@ class _F1ResultsScreenState extends State<F1ResultsScreen> {
     );
   }
 
-  // ── Conteúdo por aba ──────────────────────────────────────────
   Widget _buildContent() {
     if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
+      return const ShimmerList(itemCount: 6, itemHeight: 72);
     }
 
     if (_error != null) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.error_outline, size: 48, color: Colors.red),
-            const SizedBox(height: 12),
-            Text(_error!, textAlign: TextAlign.center),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: _loadAll,
-              child: const Text('Tentar novamente'),
-            ),
-          ],
-        ),
+      return ApiErrorWidget(
+        message: _error!,
+        onRetry: _loadAll,
       );
     }
 
@@ -205,11 +192,10 @@ class _F1ResultsScreenState extends State<F1ResultsScreen> {
   // ── Aba GPs ────────────────────────────────────────────────────
   Widget _buildGPsList() {
     if (_races.isEmpty) {
-      return Center(
-        child: Text(
-          'Nenhum resultado disponível para $_selectedYear',
-          style: const TextStyle(color: AppTheme.textSecondary),
-        ),
+      return EmptyStateWidget(
+        icon: Icons.flag_outlined,
+        title: 'Nenhum resultado disponível',
+        subtitle: 'Dados de $_selectedYear ainda não estão disponíveis.',
       );
     }
 
@@ -217,7 +203,9 @@ class _F1ResultsScreenState extends State<F1ResultsScreen> {
       padding: const EdgeInsets.all(12),
       itemCount: _races.length,
       itemBuilder: (context, index) =>
-          _buildRaceCard(_races[index] as Map<String, dynamic>),
+          _buildRaceCard(_races[index] as Map<String, dynamic>)
+              .animate()
+              .fadeIn(duration: 200.ms, delay: (index * 30).ms),
     );
   }
 
@@ -276,10 +264,6 @@ class _F1ResultsScreenState extends State<F1ResultsScreen> {
 
   Widget _buildResultRow(Map<String, dynamic> result, int index) {
     final pos = int.tryParse(result['position']?.toString() ?? '') ?? 99;
-    Color posColor = AppTheme.textSecondary;
-    if (pos == 1) posColor = AppTheme.primaryRed;
-    if (pos == 2) posColor = const Color(0xFFC0C0C0);
-    if (pos == 3) posColor = const Color(0xFFCD7F32);
 
     final status = result['status'] as String? ?? '';
     final isFinished = status == 'Finished' || status.startsWith('+');
@@ -292,10 +276,15 @@ class _F1ResultsScreenState extends State<F1ResultsScreen> {
         children: [
           SizedBox(
             width: 28,
-            child: Text(
-              result['position']?.toString() ?? '-',
-              style: TextStyle(color: posColor, fontWeight: FontWeight.bold, fontSize: 13),
-            ),
+            child: pos <= 3
+                ? _podiumBadge(pos)
+                : Text(
+                    result['position']?.toString() ?? '-',
+                    style: const TextStyle(
+                        color: AppTheme.textSecondary,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13),
+                  ),
           ),
           SizedBox(
             width: 36,
@@ -339,25 +328,50 @@ class _F1ResultsScreenState extends State<F1ResultsScreen> {
     );
   }
 
+  Widget _podiumBadge(int pos) {
+    final colors = {
+      1: const Color(0xFFFFD700),
+      2: const Color(0xFFC0C0C0),
+      3: const Color(0xFFCD7F32),
+    };
+    final color = colors[pos]!;
+    return Container(
+      width: 22,
+      height: 22,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.2),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: color.withValues(alpha: 0.5), width: 1),
+      ),
+      child: Text(
+        '$pos',
+        style: TextStyle(
+          color: color,
+          fontWeight: FontWeight.bold,
+          fontSize: 11,
+        ),
+      ),
+    );
+  }
+
   // ── Aba Pilotos ────────────────────────────────────────────────
   Widget _buildDriverStandings() {
     if (_driverStandings.isEmpty) {
-      return Center(
-        child: Text(
-          'Classificação não disponível para $_selectedYear',
-          style: const TextStyle(color: AppTheme.textSecondary),
-        ),
+      return EmptyStateWidget(
+        icon: Icons.person_outline,
+        title: 'Classificação não disponível',
+        subtitle: 'Dados de $_selectedYear ainda não estão disponíveis.',
       );
     }
 
     return Column(
       children: [
-        // Cabeçalho da tabela
         Container(
           color: AppTheme.surfaceColor,
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: Row(
-            children: const [
+          child: const Row(
+            children: [
               SizedBox(width: 32, child: Text('Pos', style: _headerStyle)),
               SizedBox(width: 40, child: Text('Cód', style: _headerStyle)),
               Expanded(child: Text('Piloto', style: _headerStyle)),
@@ -380,10 +394,6 @@ class _F1ResultsScreenState extends State<F1ResultsScreen> {
             itemBuilder: (context, index) {
               final s = _driverStandings[index] as Map<String, dynamic>;
               final pos = int.tryParse(s['position']?.toString() ?? '') ?? 99;
-              Color posColor = Colors.white;
-              if (pos == 1) posColor = AppTheme.primaryRed;
-              if (pos == 2) posColor = const Color(0xFFC0C0C0);
-              if (pos == 3) posColor = const Color(0xFFCD7F32);
 
               return Container(
                 color: index.isOdd
@@ -395,13 +405,15 @@ class _F1ResultsScreenState extends State<F1ResultsScreen> {
                   children: [
                     SizedBox(
                       width: 32,
-                      child: Text(
-                        s['position']?.toString() ?? '-',
-                        style: TextStyle(
-                            color: posColor,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 14),
-                      ),
+                      child: pos <= 3
+                          ? _podiumBadge(pos)
+                          : Text(
+                              s['position']?.toString() ?? '-',
+                              style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 14),
+                            ),
                     ),
                     SizedBox(
                       width: 40,
@@ -452,7 +464,7 @@ class _F1ResultsScreenState extends State<F1ResultsScreen> {
                     ),
                   ],
                 ),
-              );
+              ).animate().fadeIn(duration: 200.ms, delay: (index * 20).ms);
             },
           ),
         ),
@@ -463,22 +475,20 @@ class _F1ResultsScreenState extends State<F1ResultsScreen> {
   // ── Aba Construtores ───────────────────────────────────────────
   Widget _buildConstructorStandings() {
     if (_constructorStandings.isEmpty) {
-      return Center(
-        child: Text(
-          'Classificação não disponível para $_selectedYear',
-          style: const TextStyle(color: AppTheme.textSecondary),
-        ),
+      return EmptyStateWidget(
+        icon: Icons.build_outlined,
+        title: 'Classificação não disponível',
+        subtitle: 'Dados de $_selectedYear ainda não estão disponíveis.',
       );
     }
 
     return Column(
       children: [
-        // Cabeçalho da tabela
         Container(
           color: AppTheme.surfaceColor,
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: Row(
-            children: const [
+          child: const Row(
+            children: [
               SizedBox(width: 32, child: Text('Pos', style: _headerStyle)),
               Expanded(child: Text('Equipe', style: _headerStyle)),
               SizedBox(
@@ -497,10 +507,6 @@ class _F1ResultsScreenState extends State<F1ResultsScreen> {
             itemBuilder: (context, index) {
               final s = _constructorStandings[index] as Map<String, dynamic>;
               final pos = int.tryParse(s['position']?.toString() ?? '') ?? 99;
-              Color posColor = Colors.white;
-              if (pos == 1) posColor = AppTheme.primaryRed;
-              if (pos == 2) posColor = const Color(0xFFC0C0C0);
-              if (pos == 3) posColor = const Color(0xFFCD7F32);
 
               return Container(
                 color: index.isOdd
@@ -512,13 +518,15 @@ class _F1ResultsScreenState extends State<F1ResultsScreen> {
                   children: [
                     SizedBox(
                       width: 32,
-                      child: Text(
-                        s['position']?.toString() ?? '-',
-                        style: TextStyle(
-                            color: posColor,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 14),
-                      ),
+                      child: pos <= 3
+                          ? _podiumBadge(pos)
+                          : Text(
+                              s['position']?.toString() ?? '-',
+                              style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 14),
+                            ),
                     ),
                     Expanded(
                       child: Text(
@@ -548,7 +556,7 @@ class _F1ResultsScreenState extends State<F1ResultsScreen> {
                     ),
                   ],
                 ),
-              );
+              ).animate().fadeIn(duration: 200.ms, delay: (index * 20).ms);
             },
           ),
         ),
@@ -598,11 +606,12 @@ class _SectionButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isSelected = index == selected;
-    return GestureDetector(
+    return InkWell(
       onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
           color: isSelected ? AppTheme.primaryRed : AppTheme.surfaceColor,
           borderRadius: BorderRadius.circular(8),

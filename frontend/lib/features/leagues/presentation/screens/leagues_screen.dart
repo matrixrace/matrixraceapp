@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:shimmer/shimmer.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/tutorial/tutorial_bloc.dart';
 import '../../../../core/tutorial/tutorial_step.dart';
+import '../../../../shared/widgets/loading_shimmer.dart';
+import '../../../../shared/widgets/empty_state_widget.dart';
 
 /// Tela de Ligas — lista unificada com três filtros em menu suspenso:
 /// 1. Ligas: Minhas / Outras / Todas
@@ -277,27 +279,29 @@ class _LeaguesScreenState extends State<LeaguesScreen> {
           // ── Lista de ligas ────────────────────────────────────────────
           Expanded(
             child: _isLoading
-                ? _buildShimmer()
+                ? const ShimmerList(
+                    itemCount: 5,
+                    itemHeight: 100,
+                    padding: EdgeInsets.fromLTRB(16, 8, 16, 80),
+                  )
                 : _filteredLeagues.isEmpty
-                    ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Icon(Icons.groups_outlined,
-                                size: 56, color: AppTheme.textSecondary),
-                            const SizedBox(height: 16),
-                            Text(
-                              'Nenhuma liga encontrada',
-                              style: Theme.of(context).textTheme.bodyMedium,
-                            ),
-                            const SizedBox(height: 4),
-                            const Text(
-                              'Tente outros filtros',
-                              style: TextStyle(
-                                  color: AppTheme.textSecondary, fontSize: 13),
-                            ),
-                          ],
-                        ),
+                    ? EmptyStateWidget(
+                        icon: _searchQuery.isNotEmpty
+                            ? Icons.search_off
+                            : Icons.groups_outlined,
+                        title: _searchQuery.isNotEmpty
+                            ? 'Nenhuma liga encontrada'
+                            : 'Nenhuma liga disponível',
+                        subtitle: _searchQuery.isNotEmpty
+                            ? 'Tente outro termo de busca.'
+                            : 'Crie uma nova liga ou ajuste os filtros.',
+                        action: _searchQuery.isEmpty
+                            ? ElevatedButton.icon(
+                                onPressed: () => context.go('/leagues/create'),
+                                icon: const Icon(Icons.add, size: 16),
+                                label: const Text('Criar Liga'),
+                              )
+                            : null,
                       )
                     : RefreshIndicator(
                         onRefresh: _loadLeagues,
@@ -305,30 +309,14 @@ class _LeaguesScreenState extends State<LeaguesScreen> {
                           padding: const EdgeInsets.fromLTRB(16, 8, 16, 80),
                           itemCount: _filteredLeagues.length,
                           itemBuilder: (context, index) =>
-                              _buildLeagueCard(_filteredLeagues[index]),
+                              _buildLeagueCard(_filteredLeagues[index])
+                                  .animate()
+                                  .fadeIn(duration: 200.ms, delay: (index * 40).ms)
+                                  .slideX(begin: 0.02, end: 0, duration: 200.ms, delay: (index * 40).ms),
                         ),
                       ),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildShimmer() {
-    return Shimmer.fromColors(
-      baseColor: AppTheme.cardBackground,
-      highlightColor: AppTheme.surfaceColor,
-      child: ListView.builder(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 80),
-        itemCount: 5,
-        itemBuilder: (_, _) => Container(
-          margin: const EdgeInsets.only(bottom: 12),
-          height: 100,
-          decoration: BoxDecoration(
-            color: AppTheme.cardBackground,
-            borderRadius: BorderRadius.circular(16),
-          ),
-        ),
       ),
     );
   }
@@ -351,7 +339,15 @@ class _LeaguesScreenState extends State<LeaguesScreen> {
 
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
-      decoration: AppTheme.cardDecoration(),
+      decoration: BoxDecoration(
+        color: AppTheme.cardBackground,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isMember
+              ? AppTheme.primaryGreen.withValues(alpha: 0.2)
+              : AppTheme.borderSubtle,
+        ),
+      ),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
@@ -367,16 +363,24 @@ class _LeaguesScreenState extends State<LeaguesScreen> {
                   children: [
                     // Ícone da liga
                     Container(
-                      width: 38,
-                      height: 38,
+                      width: 40,
+                      height: 40,
                       decoration: BoxDecoration(
-                        color: isMember
-                            ? AppTheme.primaryGreen.withValues(alpha: 0.1)
-                            : AppTheme.surfaceColor,
-                        borderRadius: BorderRadius.circular(10),
+                        gradient: isMember
+                            ? LinearGradient(
+                                colors: [
+                                  AppTheme.primaryGreen.withValues(alpha: 0.15),
+                                  AppTheme.primaryGreen.withValues(alpha: 0.05),
+                                ],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              )
+                            : null,
+                        color: isMember ? null : AppTheme.surfaceColor,
+                        borderRadius: BorderRadius.circular(12),
                         border: Border.all(
                           color: isMember
-                              ? AppTheme.primaryGreen.withValues(alpha: 0.2)
+                              ? AppTheme.primaryGreen.withValues(alpha: 0.3)
                               : AppTheme.borderSubtle,
                         ),
                       ),
@@ -411,9 +415,9 @@ class _LeaguesScreenState extends State<LeaguesScreen> {
                       ),
                     ),
                     if (isMember)
-                      _buildStatusBadge('Membro', AppTheme.successGreen)
+                      _buildStatusBadge('Membro', AppTheme.successGreen, Icons.check_circle)
                     else if (isPending)
-                      _buildStatusBadge('Pendente', AppTheme.warningOrange),
+                      _buildStatusBadge('Pendente', AppTheme.warningOrange, Icons.hourglass_top),
                   ],
                 ),
                 const SizedBox(height: 12),
@@ -442,13 +446,20 @@ class _LeaguesScreenState extends State<LeaguesScreen> {
     );
   }
 
-  Widget _buildStatusBadge(String label, Color color) {
+  Widget _buildStatusBadge(String label, Color color, IconData icon) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: AppTheme.chipDecoration(color),
-      child: Text(
-        label,
-        style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.w600),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 10, color: color),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.w600),
+          ),
+        ],
       ),
     );
   }
@@ -505,7 +516,7 @@ class _FilterChip extends StatelessWidget {
         ? AppTheme.primaryGreen.withValues(alpha: 0.1)
         : AppTheme.surfaceColor;
 
-    return GestureDetector(
+    return InkWell(
       onTapDown: (details) async {
         final RenderBox button = context.findRenderObject() as RenderBox;
         final RenderBox overlay =
@@ -545,6 +556,7 @@ class _FilterChip extends StatelessWidget {
         );
         if (selected != null) onSelected(selected);
       },
+      borderRadius: BorderRadius.circular(10),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),

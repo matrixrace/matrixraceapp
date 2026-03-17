@@ -3,11 +3,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/services/socket_service.dart';
 import '../../../../core/tutorial/tutorial_bloc.dart';
 import '../../../../core/tutorial/tutorial_step.dart';
+import '../../../../shared/widgets/empty_state_widget.dart';
+import '../../../../shared/widgets/loading_shimmer.dart';
+import '../../../../shared/widgets/api_error_widget.dart';
+import '../../../../shared/widgets/status_chip.dart';
 
 class LiveScreen extends StatefulWidget {
   const LiveScreen({super.key});
@@ -162,32 +167,14 @@ class _LiveScreenState extends State<LiveScreen> with SingleTickerProviderStateM
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return const Center(child: CircularProgressIndicator());
+      return const ShimmerCardAndList(cardHeight: 120, listItemCount: 8, listItemHeight: 72);
     }
 
     if (_error != null) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: AppTheme.surfaceColor,
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(Icons.live_tv, size: 48, color: AppTheme.textSecondary),
-            ),
-            const SizedBox(height: 16),
-            Text(_error!, style: const TextStyle(color: AppTheme.textSecondary)),
-            const SizedBox(height: 16),
-            ElevatedButton.icon(
-              onPressed: _loadNextRace,
-              icon: const Icon(Icons.refresh),
-              label: const Text('Tentar novamente'),
-            ),
-          ],
-        ),
+      return ApiErrorWidget(
+        message: _error!,
+        icon: Icons.live_tv,
+        onRetry: _loadNextRace,
       );
     }
 
@@ -246,7 +233,7 @@ class _LiveScreenState extends State<LiveScreen> with SingleTickerProviderStateM
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppTheme.cardBackground,
+        gradient: AppTheme.cardGradient(opacity: 0.06),
         border: Border(
           bottom: BorderSide(color: AppTheme.primaryGreen.withValues(alpha: 0.15)),
         ),
@@ -263,36 +250,15 @@ class _LiveScreenState extends State<LiveScreen> with SingleTickerProviderStateM
                 ),
                 if (sessionType != null)
                   Padding(
-                    padding: const EdgeInsets.only(top: 4),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 6,
-                          height: 6,
-                          decoration: BoxDecoration(
-                            color: AppTheme.primaryGreen,
-                            shape: BoxShape.circle,
-                            boxShadow: AppTheme.glowShadow(blur: 6),
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          'Sessão ativa: ${_sessionLabel(sessionType)}',
-                          style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary),
-                        ),
-                      ],
-                    ),
+                    padding: const EdgeInsets.only(top: 6),
+                    child: StatusChip.live(label: 'AO VIVO · ${_sessionLabel(sessionType)}'),
                   ),
               ],
             ),
           ),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            decoration: BoxDecoration(
-              color: AppTheme.surfaceColor,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: AppTheme.primaryGreen.withValues(alpha: 0.3)),
-            ),
+            decoration: AppTheme.neonBorder(radius: 14),
             child: Column(
               children: [
                 const Text('Pts Provisórios', style: TextStyle(fontSize: 10, color: AppTheme.textSecondary)),
@@ -320,26 +286,10 @@ class _LiveScreenState extends State<LiveScreen> with SingleTickerProviderStateM
     final updatedAt = session?['updatedAt'];
 
     if (results.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: AppTheme.surfaceColor,
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(Icons.hourglass_empty, size: 40, color: AppTheme.textSecondary),
-            ),
-            const SizedBox(height: 16),
-            Text('${_sessionLabel(sessionType)} - Aguardando resultados',
-              style: const TextStyle(color: AppTheme.textSecondary, fontWeight: FontWeight.w500)),
-            const SizedBox(height: 4),
-            const Text('Os resultados aparecerão aqui quando o admin atualizar.',
-              style: TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
-          ],
-        ),
+      return EmptyStateWidget(
+        icon: Icons.hourglass_empty,
+        title: '${_sessionLabel(sessionType)} - Aguardando resultados',
+        subtitle: 'Os resultados aparecerão aqui quando o admin atualizar.',
       );
     }
 
@@ -355,6 +305,7 @@ class _LiveScreenState extends State<LiveScreen> with SingleTickerProviderStateM
         await _loadScoring();
       },
       child: ListView(
+        padding: const EdgeInsets.symmetric(vertical: 8),
         children: [
           if (raceControl.isNotEmpty) _buildRaceControl(raceControl),
           if (updatedAt != null)
@@ -369,7 +320,10 @@ class _LiveScreenState extends State<LiveScreen> with SingleTickerProviderStateM
                 ],
               ),
             ),
-          _buildResultsTable(results, scoringMap),
+          // Driver cards em vez de DataTable
+          ...results.asMap().entries.map((entry) =>
+            _buildDriverCard(entry.value, scoringMap, entry.key),
+          ),
         ],
       ),
     );
@@ -377,15 +331,16 @@ class _LiveScreenState extends State<LiveScreen> with SingleTickerProviderStateM
 
   Widget _buildRaceControl(List<Map<String, dynamic>> messages) {
     return Padding(
-      padding: const EdgeInsets.all(10),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       child: Column(
         children: messages.take(5).map((msg) {
           final flag = msg['flag'] as String?;
           Color flagColor = Colors.grey;
-          if (flag == 'YELLOW') flagColor = Colors.yellow;
-          if (flag == 'RED') flagColor = Colors.red;
-          if (flag == 'GREEN') flagColor = Colors.green;
-          if (flag == 'SAFETY_CAR' || flag == 'VSC') flagColor = Colors.orange;
+          IconData flagIcon = Icons.flag_outlined;
+          if (flag == 'YELLOW') { flagColor = Colors.yellow; flagIcon = Icons.warning_amber; }
+          if (flag == 'RED') { flagColor = Colors.red; flagIcon = Icons.flag; }
+          if (flag == 'GREEN') { flagColor = Colors.green; flagIcon = Icons.check_circle_outline; }
+          if (flag == 'SAFETY_CAR' || flag == 'VSC') { flagColor = Colors.orange; flagIcon = Icons.local_taxi; }
 
           return Container(
             margin: const EdgeInsets.only(bottom: 4),
@@ -393,13 +348,8 @@ class _LiveScreenState extends State<LiveScreen> with SingleTickerProviderStateM
             decoration: AppTheme.chipDecoration(flagColor),
             child: Row(
               children: [
-                if (flag != null) ...[
-                  Container(
-                    width: 8, height: 8,
-                    decoration: BoxDecoration(color: flagColor, shape: BoxShape.circle),
-                  ),
-                  const SizedBox(width: 8),
-                ],
+                Icon(flagIcon, size: 16, color: flagColor),
+                const SizedBox(width: 8),
                 Expanded(
                   child: Text(msg['message'] ?? '', style: const TextStyle(fontSize: 12, color: AppTheme.textPrimary)),
                 ),
@@ -411,129 +361,164 @@ class _LiveScreenState extends State<LiveScreen> with SingleTickerProviderStateM
     );
   }
 
-  Widget _buildResultsTable(List<Map<String, dynamic>> results, Map<int, Map<String, dynamic>> scoringMap) {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.symmetric(horizontal: 8),
-      child: DataTable(
-        columnSpacing: 14,
-        headingRowHeight: 44,
-        dataRowMinHeight: 42,
-        dataRowMaxHeight: 42,
-        headingRowColor: WidgetStateProperty.all(AppTheme.surfaceColor.withValues(alpha: 0.5)),
-        headingTextStyle: GoogleFonts.exo2(
-          fontWeight: FontWeight.w700,
-          fontSize: 12,
-          color: AppTheme.textSecondary,
-        ),
-        columns: const [
-          DataColumn(label: Text('P')),
-          DataColumn(label: Text('Piloto')),
-          DataColumn(label: Text('Equipe')),
-          DataColumn(label: Text('Tempo')),
-          DataColumn(label: Text('Gap')),
-          DataColumn(label: Text('Pneu')),
-          DataColumn(label: Text('Pits')),
-          DataColumn(label: Text('Pts')),
-        ],
-        rows: results.map((r) {
-          final driverId = r['driverId'] as int;
-          final scoring = scoringMap[driverId];
-          final pts = scoring?['provisionalPoints'] ?? 0;
-          final predicted = scoring?['predictedPosition'];
-          final pos = r['position'] as int? ?? 0;
+  /// Card individual por piloto — substitui o DataTable
+  Widget _buildDriverCard(Map<String, dynamic> r, Map<int, Map<String, dynamic>> scoringMap, int index) {
+    final driverId = r['driverId'] as int;
+    final scoring = scoringMap[driverId];
+    final pts = scoring?['provisionalPoints'] ?? 0;
+    final predicted = scoring?['predictedPosition'];
+    final pos = r['position'] as int? ?? 0;
+    final teamColor = _parseColor(r['teamColor']);
+    final tire = r['tireCompound'] as String?;
 
-          final ptsColor = pts > 15
-              ? AppTheme.primaryGreen
-              : pts >= 10
-                  ? AppTheme.warningOrange
-                  : pts > 0
-                      ? AppTheme.accentCyan
-                      : AppTheme.textSecondary;
-
-          final teamColor = _parseColor(r['teamColor']);
-
-          // Destaque para top 3
-          Color? rowBg;
-          if (pos == 1) {
-            rowBg = const Color(0xFFFFD700).withValues(alpha: 0.04);
-          } else if (pos == 2) rowBg = const Color(0xFFC0C0C0).withValues(alpha: 0.04);
-          else if (pos == 3) rowBg = const Color(0xFFCD7F32).withValues(alpha: 0.04);
-
-          return DataRow(
-            color: rowBg != null ? WidgetStateProperty.all(rowBg) : null,
-            cells: [
-              DataCell(Text(
-                '${r['position']}',
-                style: GoogleFonts.exo2(
-                  fontWeight: FontWeight.w700,
-                  fontSize: 13,
-                  color: pos <= 3 ? _medalColor(pos) : AppTheme.textPrimary,
-                ),
-              )),
-              DataCell(Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (teamColor != null)
-                    Container(
-                      width: 3, height: 20,
-                      margin: const EdgeInsets.only(right: 6),
-                      decoration: BoxDecoration(
-                        color: teamColor,
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-                  Text(r['abbreviation'] ?? '???',
-                      style: GoogleFonts.exo2(fontWeight: FontWeight.w700, fontSize: 13)),
-                  if (predicted != null) ...[
-                    const SizedBox(width: 4),
-                    Text('(P$predicted)', style: const TextStyle(fontSize: 10, color: AppTheme.textSecondary)),
-                  ],
-                ],
-              )),
-              DataCell(Text(r['teamName'] ?? '', style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary))),
-              DataCell(Text(r['bestLapTime'] ?? '-', style: GoogleFonts.exo2(fontSize: 12))),
-              DataCell(Text(r['gap'] ?? '-', style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary))),
-              DataCell(_buildTireChip(r['tireCompound'])),
-              DataCell(Text('${r['pitStops'] ?? 0}', style: const TextStyle(fontSize: 12))),
-              DataCell(Text(
-                '+$pts',
-                style: GoogleFonts.exo2(fontWeight: FontWeight.w700, fontSize: 13, color: ptsColor),
-              )),
-            ],
-          );
-        }).toList(),
-      ),
-    );
-  }
-
-  Widget _buildTireChip(String? compound) {
-    if (compound == null || compound.isEmpty) return const Text('-', style: TextStyle(fontSize: 12));
-
-    final color = switch (compound.toUpperCase()) {
-      'SOFT' => Colors.red,
-      'MEDIUM' => Colors.yellow,
-      'HARD' => Colors.white,
-      'INTERMEDIATE' => Colors.green,
-      'WET' => Colors.blue,
-      _ => Colors.grey,
-    };
+    final ptsColor = pts > 15
+        ? AppTheme.primaryGreen
+        : pts >= 10
+            ? AppTheme.warningOrange
+            : pts > 0
+                ? AppTheme.accentCyan
+                : AppTheme.textSecondary;
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 3),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: color.withValues(alpha: 0.4)),
+        color: AppTheme.cardBackground,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: pos <= 3
+              ? AppTheme.podiumColor(pos).withValues(alpha: 0.2)
+              : AppTheme.borderSubtle,
+        ),
       ),
-      child: Text(compound[0], style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: color)),
-    );
-  }
-
-  Color _medalColor(int position) {
-    if (position == 1) return const Color(0xFFFFD700);
-    if (position == 2) return const Color(0xFFC0C0C0);
-    return const Color(0xFFCD7F32);
+      child: IntrinsicHeight(
+        child: Row(
+          children: [
+            // Barra de cor da equipe
+            Container(
+              width: 4,
+              decoration: BoxDecoration(
+                color: teamColor ?? AppTheme.textSecondary,
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(14),
+                  bottomLeft: Radius.circular(14),
+                ),
+              ),
+            ),
+            // Posição
+            Container(
+              width: 44,
+              alignment: Alignment.center,
+              child: pos <= 3
+                  ? Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        gradient: AppTheme.podiumGradient(pos),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Center(
+                        child: Text(
+                          '$pos',
+                          style: GoogleFonts.exo2(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w800,
+                            color: pos == 2 ? const Color(0xFF1A1A2E) : Colors.white,
+                          ),
+                        ),
+                      ),
+                    )
+                  : Text(
+                      '$pos',
+                      style: GoogleFonts.exo2(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: AppTheme.textSecondary,
+                      ),
+                    ),
+            ),
+            // Info do piloto
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          r['abbreviation'] ?? '???',
+                          style: GoogleFonts.exo2(fontWeight: FontWeight.w700, fontSize: 14),
+                        ),
+                        if (predicted != null) ...[
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                            decoration: BoxDecoration(
+                              color: AppTheme.surfaceColor,
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text('P$predicted',
+                              style: const TextStyle(fontSize: 10, color: AppTheme.textSecondary)),
+                          ),
+                        ],
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      r['teamName'] ?? '',
+                      style: const TextStyle(fontSize: 11, color: AppTheme.textSecondary),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            // Tempo e gap
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    r['bestLapTime'] ?? '-',
+                    style: GoogleFonts.exo2(fontSize: 12, fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    r['gap'] ?? '-',
+                    style: const TextStyle(fontSize: 11, color: AppTheme.textSecondary),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 10),
+            // Pneu
+            if (tire != null && tire.isNotEmpty)
+              TireChip(compound: tire, size: 26)
+            else
+              const SizedBox(width: 26),
+            const SizedBox(width: 10),
+            // Pontos
+            Container(
+              width: 48,
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              alignment: Alignment.center,
+              child: Text(
+                '+$pts',
+                style: GoogleFonts.exo2(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 14,
+                  color: ptsColor,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+          ],
+        ),
+      ),
+    ).animate().fadeIn(duration: 200.ms, delay: (index * 30).ms).slideX(begin: 0.05, end: 0);
   }
 
   Color? _parseColor(String? hex) {

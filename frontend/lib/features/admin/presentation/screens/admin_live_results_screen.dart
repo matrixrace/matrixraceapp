@@ -3,6 +3,9 @@ import 'package:flutter/material.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/services/socket_service.dart';
+import '../../../../shared/widgets/loading_shimmer.dart';
+import '../../../../shared/widgets/empty_state_widget.dart';
+import '../../../../shared/services/feedback_service.dart';
 
 class AdminLiveResultsScreen extends StatefulWidget {
   const AdminLiveResultsScreen({super.key});
@@ -29,7 +32,6 @@ class _AdminLiveResultsScreenState extends State<AdminLiveResultsScreen>
 
   List<Map<String, dynamic>> _drivers = [];
 
-  // Editing state per session
   final Map<String, List<_DriverEntry>> _editingEntries = {};
 
   // Auto-refresh state
@@ -39,8 +41,11 @@ class _AdminLiveResultsScreenState extends State<AdminLiveResultsScreen>
   String? _autoRefreshLastRefresh;
   int _autoRefreshErrorCount = 0;
   bool _togglingAutoRefresh = false;
-  String? _autoRefreshSource; // 'manual' | 'scheduler'
+  String? _autoRefreshSource;
   bool _refreshingAll = false;
+
+  // Responsive sidebar
+  bool _sidebarCollapsed = false;
 
   StreamSubscription? _socketSub;
 
@@ -86,7 +91,7 @@ class _AdminLiveResultsScreenState extends State<AdminLiveResultsScreen>
     if (isCurrentlyActive) {
       final res = await _api.post('/live/admin/auto-refresh/stop');
       if (mounted && res.success) {
-        _showSnack('Auto-refresh parado', Colors.orange);
+        FeedbackService.warning(context, 'Auto-refresh parado');
       }
     } else {
       final res = await _api.post('/live/admin/auto-refresh/start', body: {
@@ -95,9 +100,9 @@ class _AdminLiveResultsScreenState extends State<AdminLiveResultsScreen>
         'intervalSeconds': 30,
       });
       if (mounted && res.success) {
-        _showSnack('Auto-refresh ativado (30s)', Colors.green);
+        FeedbackService.success(context, 'Auto-refresh ativado (30s)');
       } else if (mounted) {
-        _showSnack(res.message, Colors.red);
+        FeedbackService.error(context, res.message);
       }
     }
 
@@ -171,7 +176,6 @@ class _AdminLiveResultsScreenState extends State<AdminLiveResultsScreen>
               TabController(length: available.length, vsync: this);
         }
 
-        // Build editing entries from existing data or drivers list
         for (final st in available) {
           if (!_editingEntries.containsKey(st)) {
             _editingEntries[st] = _buildEntries(st);
@@ -206,7 +210,6 @@ class _AdminLiveResultsScreenState extends State<AdminLiveResultsScreen>
       }).toList();
     }
 
-    // No existing results — populate from active drivers
     final active =
         _drivers.where((d) => d['is_active'] == true).toList();
     return active.map((d) {
@@ -248,10 +251,10 @@ class _AdminLiveResultsScreenState extends State<AdminLiveResultsScreen>
     setState(() => _saving = false);
 
     if (res.success) {
-      _showSnack('Sessao ${_sessionLabel(sessionType)} salva!', Colors.green);
+      FeedbackService.success(context, 'Sessão ${_sessionLabel(sessionType)} salva!');
       await _loadSessionData();
     } else {
-      _showSnack(res.message, Colors.red);
+      FeedbackService.error(context, res.message);
     }
   }
 
@@ -260,9 +263,9 @@ class _AdminLiveResultsScreenState extends State<AdminLiveResultsScreen>
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: AppTheme.cardBackground,
-        title: const Text('Enviar para Pontuacao'),
+        title: const Text('Enviar para Pontuação'),
         content: const Text(
-            'Isso vai copiar os resultados da corrida como oficiais e calcular a pontuacao de todos os usuarios. Continuar?'),
+            'Isso vai copiar os resultados da corrida como oficiais e calcular a pontuação de todos os usuários. Continuar?'),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(ctx, false),
@@ -284,10 +287,10 @@ class _AdminLiveResultsScreenState extends State<AdminLiveResultsScreen>
     if (!mounted) return;
 
     if (res.success) {
-      _showSnack('Pontuacoes calculadas com sucesso!', Colors.green);
+      FeedbackService.success(context, 'Pontuações calculadas com sucesso!');
       _loadSessionData();
     } else {
-      _showSnack(res.message, Colors.red);
+      FeedbackService.error(context, res.message);
     }
   }
 
@@ -299,15 +302,13 @@ class _AdminLiveResultsScreenState extends State<AdminLiveResultsScreen>
     });
     if (!mounted) return;
     if (res.success) {
-      _showSnack(
-          !current ? 'Sprint Weekend ativado' : 'Sprint Weekend desativado',
-          Colors.orange);
-      // Recarrega dados para atualizar tabs
+      FeedbackService.info(context,
+          !current ? 'Sprint Weekend ativado' : 'Sprint Weekend desativado');
       _editingEntries.clear();
       await _loadSessionData();
       _loadRaces();
     } else {
-      _showSnack(res.message, Colors.red);
+      FeedbackService.error(context, res.message);
     }
   }
 
@@ -317,14 +318,14 @@ class _AdminLiveResultsScreenState extends State<AdminLiveResultsScreen>
         await _api.post('/admin/races/sync-schedule?year=$year');
     if (!mounted) return;
     if (res.success) {
-      _showSnack('Calendario $year sincronizado!', Colors.green);
+      FeedbackService.success(context, 'Calendário $year sincronizado!');
       _loadRaces();
       if (_selectedRaceId != null) {
         _editingEntries.clear();
         _loadSessionData();
       }
     } else {
-      _showSnack(res.message, Colors.red);
+      FeedbackService.error(context, res.message);
     }
   }
 
@@ -386,18 +387,8 @@ class _AdminLiveResultsScreenState extends State<AdminLiveResultsScreen>
       }
       await _loadSessionData();
     } else {
-      _showSnack(res.message, Colors.red);
+      FeedbackService.error(context, res.message);
     }
-  }
-
-  void _showSnack(String msg, Color color) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-          content: Text(msg),
-          backgroundColor: color,
-          duration: const Duration(seconds: 3)),
-    );
   }
 
   String _sessionLabel(String type) {
@@ -409,7 +400,7 @@ class _AdminLiveResultsScreenState extends State<AdminLiveResultsScreen>
       case 'FP3':
         return 'TL3';
       case 'qualifying':
-        return 'Classificacao';
+        return 'Classificação';
       case 'sprint_qualifying':
         return 'Classif. Sprint';
       case 'sprint':
@@ -432,88 +423,184 @@ class _AdminLiveResultsScreenState extends State<AdminLiveResultsScreen>
 
   @override
   Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isNarrow = screenWidth < 700;
+
+    // On narrow screens, show sidebar as a drawer-like overlay or collapsed
+    if (isNarrow && _selectedRaceId != null) {
+      // Show only content with a back button
+      return Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            color: AppTheme.cardBackground,
+            child: Row(
+              children: [
+                IconButton(
+                  onPressed: () => setState(() => _selectedRaceId = null),
+                  icon: const Icon(Icons.arrow_back),
+                  tooltip: 'Voltar às corridas',
+                ),
+                Expanded(
+                  child: Text(
+                    _raceInfo?['name'] ?? 'Corrida',
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: _loadingSessions
+                ? const ShimmerList(itemCount: 6, itemHeight: 48)
+                : _buildSessionContent(),
+          ),
+        ],
+      );
+    }
+
+    if (isNarrow) {
+      // Show only race list
+      return _buildRaceSidebar(expanded: true);
+    }
+
+    // Desktop: sidebar + content
     return Row(
       children: [
-        // Race list sidebar
-        SizedBox(
-          width: 260,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: double.infinity,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                color: AppTheme.primaryRed.withValues(alpha: 0.1),
-                child: Row(
-                  children: [
-                    const Expanded(
-                      child: Text('Selecione a Corrida',
-                          style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color: AppTheme.primaryRed)),
-                    ),
-                    IconButton(
-                      onPressed: _syncSchedule,
-                      icon: const Icon(Icons.sync, size: 18),
-                      tooltip: 'Sincronizar calendario F1',
-                      color: AppTheme.primaryRed,
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(),
-                    ),
-                  ],
-                ),
-              ),
-              Expanded(
-                child: _loadingRaces
-                    ? const Center(child: CircularProgressIndicator())
-                    : ListView.builder(
-                        itemCount: _races.length,
-                        itemBuilder: (ctx, i) {
-                          final race = _races[i];
-                          final isSelected = race['id'] == _selectedRaceId;
-                          return ListTile(
-                            dense: true,
-                            selected: isSelected,
-                            selectedTileColor:
-                                AppTheme.primaryRed.withValues(alpha: 0.1),
-                            title: Text(
-                                race['name'] ?? 'Corrida ${race['round']}',
-                                style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: isSelected
-                                        ? FontWeight.bold
-                                        : FontWeight.normal)),
-                            subtitle: Text(
-                                'R${race['round']} - ${race['season']}',
-                                style: const TextStyle(fontSize: 11)),
-                            trailing: race['isCompleted'] == true ||
-                                    race['is_completed'] == true
-                                ? const Icon(Icons.check_circle,
-                                    color: Colors.green, size: 16)
-                                : (race['isSprintWeekend'] == true ||
-                                        race['is_sprint_weekend'] == true
-                                    ? const Icon(Icons.bolt,
-                                        color: Colors.orange, size: 16)
-                                    : null),
-                            onTap: () => _selectRace(race['id'] as int),
-                          );
-                        },
+        AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          width: _sidebarCollapsed ? 0 : 260,
+          child: _sidebarCollapsed
+              ? const SizedBox.shrink()
+              : _buildRaceSidebar(expanded: true),
+        ),
+        if (!_sidebarCollapsed) const VerticalDivider(width: 1),
+        Expanded(
+          child: _selectedRaceId == null
+              ? Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (_sidebarCollapsed)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 16),
+                          child: IconButton(
+                            onPressed: () => setState(() => _sidebarCollapsed = false),
+                            icon: const Icon(Icons.menu),
+                            tooltip: 'Mostrar corridas',
+                          ),
+                        ),
+                      const EmptyStateWidget(
+                        icon: Icons.live_tv_outlined,
+                        title: 'Selecione uma corrida',
+                        subtitle: 'Escolha uma corrida na lista ao lado para gerenciar resultados ao vivo.',
+                        iconSize: 40,
                       ),
+                    ],
+                  ),
+                )
+              : _loadingSessions
+                  ? const ShimmerList(itemCount: 6, itemHeight: 48)
+                  : Column(
+                      children: [
+                        if (_sidebarCollapsed)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                            color: AppTheme.cardBackground,
+                            child: Row(
+                              children: [
+                                IconButton(
+                                  onPressed: () => setState(() => _sidebarCollapsed = false),
+                                  icon: const Icon(Icons.menu),
+                                  tooltip: 'Mostrar corridas',
+                                ),
+                                Text(
+                                  _raceInfo?['name'] ?? '',
+                                  style: const TextStyle(fontWeight: FontWeight.bold),
+                                ),
+                              ],
+                            ),
+                          ),
+                        Expanded(child: _buildSessionContent()),
+                      ],
+                    ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildRaceSidebar({required bool expanded}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: double.infinity,
+          padding:
+              const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          color: AppTheme.primaryRed.withValues(alpha: 0.1),
+          child: Row(
+            children: [
+              const Expanded(
+                child: Text('Selecione a Corrida',
+                    style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: AppTheme.primaryRed)),
               ),
+              IconButton(
+                onPressed: _syncSchedule,
+                icon: const Icon(Icons.sync, size: 18),
+                tooltip: 'Sincronizar calendário F1',
+                color: AppTheme.primaryRed,
+                constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+              ),
+              if (!MediaQuery.of(context).size.width.isNaN &&
+                  MediaQuery.of(context).size.width >= 700)
+                IconButton(
+                  onPressed: () => setState(() => _sidebarCollapsed = true),
+                  icon: const Icon(Icons.chevron_left, size: 18),
+                  tooltip: 'Recolher sidebar',
+                  constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+                ),
             ],
           ),
         ),
-        const VerticalDivider(width: 1),
-        // Content
         Expanded(
-          child: _selectedRaceId == null
-              ? const Center(
-                  child: Text('Selecione uma corrida',
-                      style: TextStyle(color: AppTheme.textSecondary)))
-              : _loadingSessions
-                  ? const Center(child: CircularProgressIndicator())
-                  : _buildSessionContent(),
+          child: _loadingRaces
+              ? const ShimmerList(itemCount: 8, itemHeight: 48)
+              : ListView.builder(
+                  itemCount: _races.length,
+                  itemBuilder: (ctx, i) {
+                    final race = _races[i];
+                    final isSelected = race['id'] == _selectedRaceId;
+                    return ListTile(
+                      dense: true,
+                      selected: isSelected,
+                      selectedTileColor:
+                          AppTheme.primaryRed.withValues(alpha: 0.1),
+                      title: Text(
+                          race['name'] ?? 'Corrida ${race['round']}',
+                          style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: isSelected
+                                  ? FontWeight.bold
+                                  : FontWeight.normal)),
+                      subtitle: Text(
+                          'R${race['round']} - ${race['season']}',
+                          style: const TextStyle(fontSize: 11)),
+                      trailing: race['isCompleted'] == true ||
+                              race['is_completed'] == true
+                          ? const Icon(Icons.check_circle,
+                              color: Colors.green, size: 16)
+                          : (race['isSprintWeekend'] == true ||
+                                  race['is_sprint_weekend'] == true
+                              ? const Icon(Icons.bolt,
+                                  color: Colors.orange, size: 16)
+                              : null),
+                      onTap: () => _selectRace(race['id'] as int),
+                    );
+                  },
+                ),
         ),
       ],
     );
@@ -521,7 +608,14 @@ class _AdminLiveResultsScreenState extends State<AdminLiveResultsScreen>
 
   Widget _buildSessionContent() {
     if (_availableSessions.isEmpty) {
-      return const Center(child: Text('Nenhuma sessao disponivel'));
+      return const Center(
+        child: EmptyStateWidget(
+          icon: Icons.timer_off_outlined,
+          title: 'Nenhuma sessão disponível',
+          subtitle: 'Configure o tipo de corrida (normal/sprint) para habilitar as sessões.',
+          iconSize: 40,
+        ),
+      );
     }
 
     return Column(
@@ -531,18 +625,22 @@ class _AdminLiveResultsScreenState extends State<AdminLiveResultsScreen>
           width: double.infinity,
           padding: const EdgeInsets.all(12),
           color: AppTheme.cardBackground,
-          child: Row(
+          child: Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            alignment: WrapAlignment.start,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               Text(_raceInfo?['name'] ?? '',
                   style: const TextStyle(
                       fontSize: 16, fontWeight: FontWeight.bold)),
-              const SizedBox(width: 8),
               // Sprint toggle
-              GestureDetector(
+              InkWell(
                 onTap: _toggleSprint,
+                borderRadius: BorderRadius.circular(4),
                 child: Container(
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
                       color: _raceInfo?['isSprintWeekend'] == true
                           ? Colors.orange.withValues(alpha: 0.2)
@@ -576,22 +674,26 @@ class _AdminLiveResultsScreenState extends State<AdminLiveResultsScreen>
                   ),
                 ),
               ),
-              if (_raceInfo?['isCompleted'] == true) ...[
-                const SizedBox(width: 8),
+              if (_raceInfo?['isCompleted'] == true)
                 Container(
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
                       color: Colors.green.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(4)),
-                  child: const Text('FINALIZADA',
-                      style: TextStyle(
-                          fontSize: 10,
-                          color: Colors.green,
-                          fontWeight: FontWeight.bold)),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.check_circle, size: 12, color: Colors.green),
+                      SizedBox(width: 4),
+                      Text('FINALIZADA',
+                          style: TextStyle(
+                              fontSize: 10,
+                              color: Colors.green,
+                              fontWeight: FontWeight.bold)),
+                    ],
+                  ),
                 ),
-              ],
-              const Spacer(),
               // Refresh all sessions button
               ElevatedButton.icon(
                 onPressed: _refreshingAll ? null : _refreshAllSessions,
@@ -649,7 +751,10 @@ class _AdminLiveResultsScreenState extends State<AdminLiveResultsScreen>
         // Action bar
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-          child: Row(
+          child: Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               // Save button
               ElevatedButton.icon(
@@ -665,7 +770,6 @@ class _AdminLiveResultsScreenState extends State<AdminLiveResultsScreen>
                 style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.green.shade700),
               ),
-              const SizedBox(width: 8),
               // Reset order
               OutlinedButton.icon(
                 onPressed: () {
@@ -676,7 +780,6 @@ class _AdminLiveResultsScreenState extends State<AdminLiveResultsScreen>
                 icon: const Icon(Icons.refresh, size: 18),
                 label: const Text('Resetar'),
               ),
-              const SizedBox(width: 8),
               // Auto-refresh toggle
               Builder(builder: (_) {
                 final isThisActive = _autoRefreshActive &&
@@ -697,7 +800,7 @@ class _AdminLiveResultsScreenState extends State<AdminLiveResultsScreen>
                                 const Text('Parar Auto-Refresh'),
                                 if (_autoRefreshLastRefresh != null)
                                   Text(
-                                    '${_autoRefreshSource == 'scheduler' ? '[Auto] ' : ''}Ultimo: ${_formatTime(_autoRefreshLastRefresh!)}${_autoRefreshErrorCount > 0 ? ' ($_autoRefreshErrorCount erros)' : ''}',
+                                    '${_autoRefreshSource == 'scheduler' ? '[Auto] ' : ''}Último: ${_formatTime(_autoRefreshLastRefresh!)}${_autoRefreshErrorCount > 0 ? ' ($_autoRefreshErrorCount erros)' : ''}',
                                     style: const TextStyle(fontSize: 9),
                                   ),
                               ],
@@ -711,22 +814,19 @@ class _AdminLiveResultsScreenState extends State<AdminLiveResultsScreen>
                             label: const Text('Auto-Refresh'),
                           );
               }),
-              const Spacer(),
               if (updatedAt != null)
                 Text('Atualizado: ${_formatTime(updatedAt)}',
                     style:
                         const TextStyle(fontSize: 11, color: Colors.grey)),
               // Finalize (race only)
-              if (isRace && hasResults) ...[
-                const SizedBox(width: 16),
+              if (isRace && hasResults)
                 ElevatedButton.icon(
                   onPressed: _finalizeResults,
                   icon: const Icon(Icons.send, size: 18),
-                  label: const Text('Enviar para Pontuacao'),
+                  label: const Text('Enviar para Pontuação'),
                   style: ElevatedButton.styleFrom(
                       backgroundColor: AppTheme.primaryRed),
                 ),
-              ],
             ],
           ),
         ),
@@ -734,8 +834,12 @@ class _AdminLiveResultsScreenState extends State<AdminLiveResultsScreen>
         if (entries.isEmpty)
           const Expanded(
               child: Center(
-                  child: Text('Nenhum piloto encontrado.',
-                      style: TextStyle(color: AppTheme.textSecondary))))
+                  child: EmptyStateWidget(
+                    icon: Icons.person_off_outlined,
+                    title: 'Nenhum piloto encontrado',
+                    subtitle: 'Sincronize os pilotos primeiro.',
+                    iconSize: 36,
+                  )))
         else
           Expanded(
             child: SingleChildScrollView(
@@ -759,7 +863,6 @@ class _AdminLiveResultsScreenState extends State<AdminLiveResultsScreen>
   }
 }
 
-// Data class for a driver entry in the editable table
 class _DriverEntry {
   final dynamic driverId;
   final String name;
@@ -776,7 +879,6 @@ class _DriverEntry {
   });
 }
 
-// Editable table widget with drag-to-reorder rows
 class _EditableResultsTable extends StatelessWidget {
   final List<_DriverEntry> entries;
   final void Function(int oldIndex, int newIndex) onReorder;
@@ -849,7 +951,6 @@ class _EditableResultsTable extends StatelessWidget {
   }
 }
 
-// Single editable row
 class _DriverRow extends StatelessWidget {
   final int position;
   final _DriverEntry entry;
@@ -872,15 +973,12 @@ class _DriverRow extends StatelessWidget {
       ),
       child: Row(
         children: [
-          // Drag handle
           const Icon(Icons.drag_handle, color: Colors.grey, size: 20),
           const SizedBox(width: 8),
-          // Position
           SizedBox(
             width: 42,
             child: _positionBadge(position),
           ),
-          // Driver name
           Expanded(
             flex: 3,
             child: Column(
@@ -895,7 +993,6 @@ class _DriverRow extends StatelessWidget {
               ],
             ),
           ),
-          // Lap time / Gap input
           Expanded(
             flex: 3,
             child: SizedBox(

@@ -3,11 +3,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:shimmer/shimmer.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/tutorial/tutorial_bloc.dart';
 import '../../../../core/tutorial/tutorial_step.dart';
+import '../../../../shared/widgets/empty_state_widget.dart';
+import '../../../../shared/widgets/loading_shimmer.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 
 /// Tela Inicial
@@ -121,39 +123,7 @@ class _HomeScreenState extends State<HomeScreen> {
         await _loadUpcomingRaces();
         await _loadMyPredictions();
       },
-      child: _isLoading ? _buildShimmer() : _buildContent(),
-    );
-  }
-
-  Widget _buildShimmer() {
-    return Shimmer.fromColors(
-      baseColor: AppTheme.cardBackground,
-      highlightColor: AppTheme.surfaceColor,
-      child: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          Container(
-            height: 260,
-            decoration: BoxDecoration(
-              color: AppTheme.cardBackground,
-              borderRadius: BorderRadius.circular(16),
-            ),
-          ),
-          const SizedBox(height: 24),
-          Container(height: 20, width: 100, color: AppTheme.cardBackground),
-          const SizedBox(height: 12),
-          ...List.generate(3, (_) => Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: Container(
-              height: 80,
-              decoration: BoxDecoration(
-                color: AppTheme.cardBackground,
-                borderRadius: BorderRadius.circular(16),
-              ),
-            ),
-          )),
-        ],
-      ),
+      child: _isLoading ? const ShimmerCardAndList() : _buildContent(),
     );
   }
 
@@ -168,7 +138,10 @@ class _HomeScreenState extends State<HomeScreen> {
             style: AppTheme.displayStyle(fontSize: 22),
           ),
           const SizedBox(height: 12),
-          _buildNextRaceCard(_upcomingRaces[0]),
+          _buildNextRaceCard(_upcomingRaces[0])
+              .animate()
+              .fadeIn(duration: 400.ms)
+              .slideY(begin: 0.05, end: 0),
           const SizedBox(height: 28),
         ],
         Text(
@@ -178,23 +151,18 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         const SizedBox(height: 12),
         if (_upcomingRaces.isEmpty)
-          Container(
-            padding: const EdgeInsets.all(32),
-            decoration: AppTheme.cardDecoration(),
-            child: Column(
-              children: [
-                Icon(Icons.calendar_today_outlined, size: 48, color: AppTheme.textSecondary),
-                const SizedBox(height: 12),
-                const Text(
-                  'Nenhuma corrida disponível no momento.\nO admin precisa cadastrar as corridas.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: AppTheme.textSecondary),
-                ),
-              ],
-            ),
+          const EmptyStateWidget(
+            icon: Icons.calendar_today_outlined,
+            title: 'Nenhuma corrida disponível',
+            subtitle: 'O admin precisa cadastrar as corridas.',
           )
         else
-          ..._upcomingRaces.skip(1).map(_buildRaceListItem),
+          ..._upcomingRaces.skip(1).toList().asMap().entries.map((entry) =>
+            _buildRaceListItem(entry.value)
+                .animate()
+                .fadeIn(duration: 300.ms, delay: (entry.key * 60).ms)
+                .slideX(begin: 0.04, end: 0),
+          ),
       ],
     );
   }
@@ -208,14 +176,14 @@ class _HomeScreenState extends State<HomeScreen> {
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(20),
-        color: AppTheme.cardBackground,
+        gradient: AppTheme.cardGradient(opacity: 0.08),
         border: Border.all(
           color: AppTheme.primaryGreen.withValues(alpha: 0.25),
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.3),
-            blurRadius: 16,
+            color: AppTheme.primaryGreen.withValues(alpha: 0.08),
+            blurRadius: 20,
             offset: const Offset(0, 4),
           ),
         ],

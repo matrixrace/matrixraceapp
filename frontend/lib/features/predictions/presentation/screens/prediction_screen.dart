@@ -2,8 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/network/api_client.dart';
+import '../../../../shared/widgets/loading_shimmer.dart';
+import '../../../../shared/services/feedback_service.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 
 /// Tela de Palpite - 3 passos:
@@ -179,12 +182,7 @@ class _PredictionScreenState extends State<PredictionScreen> {
     setState(() => _isLoadingQuickOrder = false);
 
     if (!res.success || res.data == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(res.message.isNotEmpty ? res.message : 'Erro ao carregar ordem'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      FeedbackService.error(context, res.message.isNotEmpty ? res.message : 'Erro ao carregar ordem');
       return;
     }
 
@@ -193,9 +191,7 @@ class _PredictionScreenState extends State<PredictionScreen> {
         .toList();
 
     if (orderedIds.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Nenhum dado disponível para este GP')),
-      );
+      FeedbackService.warning(context, 'Nenhum dado disponível para este GP');
       return;
     }
 
@@ -225,9 +221,7 @@ class _PredictionScreenState extends State<PredictionScreen> {
     setState(() => _isLoadingQuickOrder = false);
 
     if (!res.success || res.data == null || (res.data as List).isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('IA não disponível para esta corrida')),
-      );
+      FeedbackService.warning(context, 'IA não disponível para esta corrida');
       return;
     }
 
@@ -372,9 +366,7 @@ class _PredictionScreenState extends State<PredictionScreen> {
       if (response.success) {
         if (widget.editOrderOnly) {
           // Volta direto para a tela de visualização após salvar a nova ordem
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Ordem atualizada!'), backgroundColor: Colors.green),
-          );
+          FeedbackService.success(context, 'Ordem atualizada!');
           context.go('/predictions-view/${widget.raceId}');
           return;
         }
@@ -382,22 +374,16 @@ class _PredictionScreenState extends State<PredictionScreen> {
           _savedLockType = _selectedLockType;
           _currentStep = 3;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Palpite salvo!'), backgroundColor: Colors.green),
-        );
+        FeedbackService.success(context, 'Palpite salvo!');
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(response.message.isNotEmpty ? response.message : 'Erro ao salvar'), backgroundColor: Colors.red),
-        );
+        FeedbackService.error(context, response.message.isNotEmpty ? response.message : 'Erro ao salvar');
       }
     }
   }
 
   Future<void> _applyToLeagues() async {
     if (_selectedLeagueIds.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Selecione ao menos uma liga'), backgroundColor: Colors.orange),
-      );
+      FeedbackService.warning(context, 'Selecione ao menos uma liga');
       return;
     }
 
@@ -447,19 +433,12 @@ class _PredictionScreenState extends State<PredictionScreen> {
           ),
         );
       } else if (appliedCount > 0) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Palpite aplicado em $appliedCount liga(s)!'),
-            backgroundColor: Colors.green,
-          ),
-        );
+        FeedbackService.success(context, 'Palpite aplicado em $appliedCount liga(s)!');
       }
 
       if (mounted) context.go('/predictions-view/${widget.raceId}');
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(response.message), backgroundColor: Colors.red),
-      );
+      FeedbackService.error(context, response.message);
     }
   }
 
@@ -482,7 +461,7 @@ class _PredictionScreenState extends State<PredictionScreen> {
         ),
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? const ShimmerList(itemCount: 10, itemHeight: 56)
           : Column(
               children: [
                 if (!widget.editOrderOnly) _buildStepIndicator(),
@@ -495,41 +474,81 @@ class _PredictionScreenState extends State<PredictionScreen> {
 
   Widget _buildStepIndicator() {
     return Container(
-      color: AppTheme.cardBackground,
-      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 20),
+      decoration: BoxDecoration(
+        color: AppTheme.cardBackground,
+        border: Border(bottom: BorderSide(color: AppTheme.borderSubtle)),
+      ),
+      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 20),
       child: Row(
         children: [
-          _stepDot(1, 'Palpite'),
-          Expanded(child: Container(height: 2, color: _currentStep >= 2 ? AppTheme.primaryRed : Colors.grey.shade700)),
-          _stepDot(2, 'Prazo'),
-          Expanded(child: Container(height: 2, color: _currentStep >= 3 ? AppTheme.primaryRed : Colors.grey.shade700)),
-          _stepDot(3, 'Ligas'),
+          _stepDot(1, 'Palpite', Icons.format_list_numbered),
+          _stepLine(1),
+          _stepDot(2, 'Prazo', Icons.timer_outlined),
+          _stepLine(2),
+          _stepDot(3, 'Ligas', Icons.groups_outlined),
         ],
       ),
     );
   }
 
-  Widget _stepDot(int step, String label) {
+  Widget _stepLine(int afterStep) {
+    final done = _currentStep > afterStep;
+    return Expanded(
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 300),
+        height: 2.5,
+        margin: const EdgeInsets.symmetric(horizontal: 4),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(2),
+          color: done ? AppTheme.primaryGreen : AppTheme.surfaceColor,
+        ),
+      ),
+    );
+  }
+
+  Widget _stepDot(int step, String label, IconData icon) {
     final isActive = _currentStep == step;
     final isDone = _currentStep > step;
+    final color = isDone
+        ? AppTheme.successGreen
+        : isActive
+            ? AppTheme.primaryGreen
+            : AppTheme.textSecondary;
+
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Container(
-          width: 28,
-          height: 28,
+        AnimatedContainer(
+          duration: const Duration(milliseconds: 300),
+          width: isActive ? 36 : 30,
+          height: isActive ? 36 : 30,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: isDone ? Colors.green : isActive ? AppTheme.primaryRed : Colors.grey.shade700,
+            color: isDone
+                ? AppTheme.successGreen
+                : isActive
+                    ? AppTheme.primaryGreen.withValues(alpha: 0.15)
+                    : AppTheme.surfaceColor,
+            border: Border.all(
+              color: color,
+              width: isActive ? 2 : 1.5,
+            ),
           ),
           child: Center(
             child: isDone
                 ? const Icon(Icons.check, size: 16, color: Colors.white)
-                : Text('$step', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
+                : Icon(icon, size: isActive ? 18 : 14, color: color),
           ),
         ),
-        const SizedBox(height: 2),
-        Text(label, style: TextStyle(fontSize: 10, color: isActive ? AppTheme.primaryRed : Colors.grey)),
+        const SizedBox(height: 4),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 10,
+            color: color,
+            fontWeight: isActive || isDone ? FontWeight.w600 : FontWeight.w400,
+          ),
+        ),
       ],
     );
   }
@@ -554,10 +573,13 @@ class _PredictionScreenState extends State<PredictionScreen> {
         _buildQuickOrderButtons(),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-          color: AppTheme.primaryRed.withValues(alpha: 0.1),
+          decoration: BoxDecoration(
+            color: AppTheme.primaryGreen.withValues(alpha: 0.08),
+            border: Border(bottom: BorderSide(color: AppTheme.borderSubtle)),
+          ),
           child: const Row(
             children: [
-              Icon(Icons.drag_indicator, color: AppTheme.primaryRed, size: 18),
+              Icon(Icons.drag_indicator, color: AppTheme.primaryGreen, size: 18),
               SizedBox(width: 8),
               Expanded(
                 child: Text(
@@ -570,7 +592,7 @@ class _PredictionScreenState extends State<PredictionScreen> {
         ),
         Expanded(
           child: ReorderableListView.builder(
-            padding: const EdgeInsets.only(bottom: 8),
+            padding: const EdgeInsets.only(bottom: 8, top: 4),
             itemCount: _drivers.length,
             onReorder: (oldIndex, newIndex) {
               setState(() {
@@ -583,35 +605,98 @@ class _PredictionScreenState extends State<PredictionScreen> {
               final driver = _drivers[index];
               final teamColor = _parseColor(driver['team_color'] ?? '#666666');
 
-              return Card(
+              return Container(
                 key: ValueKey(driver['id']),
                 margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 3),
-                child: ListTile(
-                  leading: Row(
-                    mainAxisSize: MainAxisSize.min,
+                decoration: BoxDecoration(
+                  color: AppTheme.cardBackground,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: index < 3
+                        ? AppTheme.podiumColor(index + 1).withValues(alpha: 0.3)
+                        : AppTheme.borderSubtle,
+                  ),
+                ),
+                child: IntrinsicHeight(
+                  child: Row(
                     children: [
-                      // Posição (círculo com medalha para pódio)
+                      // Barra de cor da equipe
                       Container(
-                        width: 28,
-                        height: 28,
+                        width: 4,
                         decoration: BoxDecoration(
-                          color: index == 0 ? const Color(0xFFFFD700) : index == 1 ? const Color(0xFFC0C0C0) : index == 2 ? const Color(0xFFCD7F32) : AppTheme.surfaceColor,
-                          shape: BoxShape.circle,
-                        ),
-                        child: Center(
-                          child: Text(
-                            '${index + 1}',
-                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: index < 3 ? Colors.black : Colors.white),
+                          color: teamColor,
+                          borderRadius: const BorderRadius.only(
+                            topLeft: Radius.circular(12),
+                            bottomLeft: Radius.circular(12),
                           ),
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      // Foto do piloto
+                      // Posição
+                      Container(
+                        width: 36,
+                        alignment: Alignment.center,
+                        child: index < 3
+                            ? Container(
+                                width: 26,
+                                height: 26,
+                                decoration: BoxDecoration(
+                                  gradient: AppTheme.podiumGradient(index + 1),
+                                  borderRadius: BorderRadius.circular(7),
+                                ),
+                                child: Center(
+                                  child: Text(
+                                    '${index + 1}',
+                                    style: GoogleFonts.exo2(
+                                      fontWeight: FontWeight.w800,
+                                      fontSize: 12,
+                                      color: index == 1 ? const Color(0xFF1A1A2E) : Colors.white,
+                                    ),
+                                  ),
+                                ),
+                              )
+                            : Text(
+                                '${index + 1}',
+                                style: GoogleFonts.exo2(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 13,
+                                  color: AppTheme.textSecondary,
+                                ),
+                              ),
+                      ),
+                      const SizedBox(width: 4),
+                      // Foto
                       _buildDriverPhoto(driver, teamColor),
+                      const SizedBox(width: 10),
+                      // Nome
+                      Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                '${driver['first_name'] ?? ''} ${driver['last_name'] ?? ''}',
+                                style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              const SizedBox(height: 1),
+                              Text(
+                                driver['team_name'] ?? '',
+                                style: TextStyle(color: teamColor, fontSize: 11),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      // Drag handle
+                      Padding(
+                        padding: const EdgeInsets.only(right: 10),
+                        child: Icon(Icons.drag_handle, size: 20, color: AppTheme.textSecondary.withValues(alpha: 0.5)),
+                      ),
                     ],
                   ),
-                  title: Text('${driver['first_name'] ?? ''} ${driver['last_name'] ?? ''}', style: const TextStyle(fontWeight: FontWeight.w600)),
-                  subtitle: Text(driver['team_name'] ?? '', style: TextStyle(color: teamColor, fontSize: 12)),
                 ),
               );
             },
@@ -1133,45 +1218,60 @@ class _PredictionScreenState extends State<PredictionScreen> {
 class _QuickBtn extends StatelessWidget {
   final String label;
   final IconData icon;
-  final VoidCallback? onTap; // null = desabilitado
+  final VoidCallback? onTap;
 
   const _QuickBtn(this.label, this.icon, {required this.onTap});
 
   @override
   Widget build(BuildContext context) {
     final enabled = onTap != null;
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        decoration: BoxDecoration(
-          color: enabled
-              ? AppTheme.surfaceColor
-              : AppTheme.surfaceColor.withValues(alpha: 0.4),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          decoration: BoxDecoration(
             color: enabled
-                ? AppTheme.primaryRed.withValues(alpha: 0.5)
-                : Colors.white12,
+                ? AppTheme.surfaceColor
+                : AppTheme.surfaceColor.withValues(alpha: 0.4),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: enabled
+                  ? AppTheme.primaryGreen.withValues(alpha: 0.4)
+                  : Colors.white12,
+            ),
           ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              icon,
-              size: 14,
-              color: enabled ? AppTheme.primaryRed : Colors.white24,
-            ),
-            const SizedBox(width: 5),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 12,
-                color: enabled ? Colors.white70 : Colors.white24,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 22,
+                height: 22,
+                decoration: BoxDecoration(
+                  color: enabled
+                      ? AppTheme.primaryGreen.withValues(alpha: 0.1)
+                      : Colors.transparent,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Icon(
+                  icon,
+                  size: 13,
+                  color: enabled ? AppTheme.primaryGreen : Colors.white24,
+                ),
               ),
-            ),
-          ],
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: enabled ? Colors.white70 : Colors.white24,
+                  fontWeight: enabled ? FontWeight.w500 : FontWeight.w400,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

@@ -4,11 +4,14 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:intl/date_symbol_data_local.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/podium_badges.dart';
 import '../../../../core/tutorial/tutorial_bloc.dart';
 import '../../../../core/tutorial/tutorial_step.dart';
+import '../../../../shared/widgets/empty_state_widget.dart';
+import '../../../../shared/widgets/loading_shimmer.dart';
 
 /// Tela de Ranking Global
 /// Pontuação por GP (deduplicada entre ligas) com filtros de período
@@ -174,7 +177,7 @@ class _RankingsScreenState extends State<RankingsScreen> {
                       icon: const Icon(Icons.chevron_left,
                           color: AppTheme.textSecondary, size: 22),
                       onPressed: _prevMonth,
-                      visualDensity: VisualDensity.compact,
+                      constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
                     ),
                     Text(
                       _monthLabel(),
@@ -188,7 +191,7 @@ class _RankingsScreenState extends State<RankingsScreen> {
                       icon: const Icon(Icons.chevron_right,
                           color: AppTheme.textSecondary, size: 22),
                       onPressed: _nextMonth,
-                      visualDensity: VisualDensity.compact,
+                      constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
                     ),
                   ],
                 ),
@@ -196,31 +199,35 @@ class _RankingsScreenState extends State<RankingsScreen> {
 
               if (_activeFilter == 'custom') ...[
                 const SizedBox(height: 10),
-                GestureDetector(
-                  onTap: _pickDateRange,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: AppTheme.surfaceColor,
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: AppTheme.borderSubtle),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(Icons.date_range,
-                            size: 16, color: AppTheme.primaryGreen),
-                        const SizedBox(width: 8),
-                        Text(
-                          _customRange != null
-                              ? '${DateFormat('dd/MM/yyyy').format(_customRange!.start)} — ${DateFormat('dd/MM/yyyy').format(_customRange!.end)}'
-                              : 'Selecionar período',
-                          style: const TextStyle(
-                            fontSize: 13,
-                            color: AppTheme.textPrimary,
+                Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: _pickDateRange,
+                    borderRadius: BorderRadius.circular(10),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: AppTheme.surfaceColor,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: AppTheme.borderSubtle),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.date_range,
+                              size: 16, color: AppTheme.primaryGreen),
+                          const SizedBox(width: 8),
+                          Text(
+                            _customRange != null
+                                ? '${DateFormat('dd/MM/yyyy').format(_customRange!.start)} — ${DateFormat('dd/MM/yyyy').format(_customRange!.end)}'
+                                : 'Selecionar período',
+                            style: const TextStyle(
+                              fontSize: 13,
+                              color: AppTheme.textPrimary,
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -232,77 +239,183 @@ class _RankingsScreenState extends State<RankingsScreen> {
         // ── Lista do ranking ──────────────────────────────────────────────
         Expanded(
           child: _isLoading
-              ? const Center(child: CircularProgressIndicator())
+              ? const ShimmerList(itemCount: 8, itemHeight: 64)
               : _ranking.isEmpty
-                  ? Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(20),
-                            decoration: BoxDecoration(
-                              color: AppTheme.surfaceColor,
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(Icons.leaderboard_outlined,
-                                size: 48, color: AppTheme.textSecondary),
-                          ),
-                          const SizedBox(height: 16),
-                          const Text('Nenhuma pontuação neste período.',
-                              style: TextStyle(color: AppTheme.textSecondary)),
-                          const SizedBox(height: 8),
-                          TextButton(
-                            onPressed: () {
-                              setState(() {
-                                _activeFilter = 'month';
-                                _selectedMonth = DateTime.now();
-                              });
-                              _load();
-                            },
-                            child: const Text('Ver mês atual'),
-                          ),
-                        ],
+                  ? EmptyStateWidget(
+                      icon: Icons.leaderboard_outlined,
+                      title: 'Nenhuma pontuação neste período',
+                      subtitle: 'Tente outro filtro ou período.',
+                      action: TextButton(
+                        onPressed: () {
+                          setState(() {
+                            _activeFilter = 'month';
+                            _selectedMonth = DateTime.now();
+                          });
+                          _load();
+                        },
+                        child: const Text('Ver mês atual'),
                       ),
                     )
                   : RefreshIndicator(
                       onRefresh: _load,
-                      child: ListView.builder(
+                      child: ListView(
                         padding: const EdgeInsets.symmetric(vertical: 4),
-                        itemCount: _ranking.length,
-                        itemBuilder: (context, i) {
-                          final entry = _ranking[i] as Map<String, dynamic>;
-                          final position = entry['position'] ?? (i + 1);
-                          final name = entry['displayName'] ??
-                              entry['display_name'] ??
-                              'Usuário';
-                          final avatar =
-                              entry['avatarUrl'] ?? entry['avatar_url'];
-                          final points = int.tryParse(
-                                  entry['totalPoints']?.toString() ??
-                                      entry['total_points']?.toString() ??
-                                      '0') ??
-                              0;
-                          final races = int.tryParse(
-                                  entry['racesPlayed']?.toString() ??
-                                      entry['races_played']?.toString() ??
-                                      '0') ??
-                              0;
-                          final userId = entry['userId'] ?? entry['user_id'];
-
-                          return _buildRankingRow(
-                            position: position,
-                            name: name.toString(),
-                            avatar: avatar?.toString(),
-                            points: points,
-                            races: races,
-                            userId: userId,
-                            podiumStats: entry['podiumStats'] as Map<String, dynamic>?,
-                          );
-                        },
+                        children: [
+                          // Pódio visual para top 3
+                          if (_ranking.length >= 3) _buildPodium(),
+                          // Lista restante
+                          ..._ranking.asMap().entries.map((entry) {
+                            final i = entry.key;
+                            final data = entry.value as Map<String, dynamic>;
+                            final position = data['position'] ?? (i + 1);
+                            // Pular top 3 se já mostrados no pódio
+                            if (_ranking.length >= 3 && position <= 3) {
+                              return const SizedBox.shrink();
+                            }
+                            return _buildRankingRow(
+                              position: position,
+                              name: (data['displayName'] ?? data['display_name'] ?? 'Usuário').toString(),
+                              avatar: (data['avatarUrl'] ?? data['avatar_url'])?.toString(),
+                              points: int.tryParse(data['totalPoints']?.toString() ?? data['total_points']?.toString() ?? '0') ?? 0,
+                              races: int.tryParse(data['racesPlayed']?.toString() ?? data['races_played']?.toString() ?? '0') ?? 0,
+                              userId: data['userId'] ?? data['user_id'],
+                              podiumStats: data['podiumStats'] as Map<String, dynamic>?,
+                            );
+                          }),
+                        ],
                       ),
                     ),
         ),
       ],
+    );
+  }
+
+  /// Pódio visual com destaque para top 3
+  Widget _buildPodium() {
+    final top3 = _ranking.take(3).toList();
+    // Ordem visual: 2° | 1° | 3°
+    final second = top3[1] as Map<String, dynamic>;
+    final first = top3[0] as Map<String, dynamic>;
+    final third = top3[2] as Map<String, dynamic>;
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(12, 12, 12, 8),
+      padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 8),
+      decoration: BoxDecoration(
+        gradient: AppTheme.cardGradient(opacity: 0.08),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppTheme.primaryGreen.withValues(alpha: 0.15)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          Expanded(child: _buildPodiumColumn(second, 2, 80)),
+          Expanded(child: _buildPodiumColumn(first, 1, 100)),
+          Expanded(child: _buildPodiumColumn(third, 3, 70)),
+        ],
+      ),
+    ).animate().fadeIn(duration: 400.ms).scale(begin: const Offset(0.95, 0.95));
+  }
+
+  Widget _buildPodiumColumn(Map<String, dynamic> data, int position, double height) {
+    final name = (data['displayName'] ?? data['display_name'] ?? 'Usuário').toString();
+    final avatar = (data['avatarUrl'] ?? data['avatar_url'])?.toString();
+    final points = int.tryParse(data['totalPoints']?.toString() ?? data['total_points']?.toString() ?? '0') ?? 0;
+    final userId = data['userId'] ?? data['user_id'];
+    final color = AppTheme.podiumColor(position);
+    final medals = {1: '🥇', 2: '🥈', 3: '🥉'};
+
+    return GestureDetector(
+      onTap: userId != null ? () => context.push('/users/$userId') : null,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Medal
+          Text(medals[position]!, style: const TextStyle(fontSize: 24)),
+          const SizedBox(height: 6),
+          // Avatar
+          Container(
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(color: color, width: 2.5),
+              boxShadow: [
+                BoxShadow(
+                  color: color.withValues(alpha: 0.3),
+                  blurRadius: 12,
+                ),
+              ],
+            ),
+            child: CircleAvatar(
+              radius: position == 1 ? 32 : 26,
+              backgroundColor: AppTheme.surfaceColor,
+              backgroundImage: avatar != null ? NetworkImage(avatar) : null,
+              child: avatar == null
+                  ? Text(
+                      name.isNotEmpty ? name[0].toUpperCase() : '?',
+                      style: GoogleFonts.exo2(
+                        color: color,
+                        fontWeight: FontWeight.w800,
+                        fontSize: position == 1 ? 22 : 18,
+                      ),
+                    )
+                  : null,
+            ),
+          ),
+          const SizedBox(height: 8),
+          // Name
+          Text(
+            name.split(' ').first,
+            style: TextStyle(
+              fontWeight: FontWeight.w700,
+              fontSize: position == 1 ? 14 : 12,
+              color: AppTheme.textPrimary,
+            ),
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 4),
+          // Points
+          Text(
+            '$points pts',
+            style: GoogleFonts.exo2(
+              fontSize: position == 1 ? 18 : 15,
+              fontWeight: FontWeight.w800,
+              color: color,
+            ),
+          ),
+          const SizedBox(height: 8),
+          // Pedestal
+          Container(
+            width: double.infinity,
+            height: height,
+            margin: const EdgeInsets.symmetric(horizontal: 6),
+            decoration: BoxDecoration(
+              gradient: AppTheme.podiumGradient(position),
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(10),
+                topRight: Radius.circular(10),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: color.withValues(alpha: 0.2),
+                  blurRadius: 8,
+                  offset: const Offset(0, -2),
+                ),
+              ],
+            ),
+            child: Center(
+              child: Text(
+                '$position°',
+                style: GoogleFonts.exo2(
+                  fontSize: position == 1 ? 28 : 22,
+                  fontWeight: FontWeight.w900,
+                  color: position == 2 ? const Color(0xFF1A1A2E) : Colors.white,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -315,46 +428,46 @@ class _RankingsScreenState extends State<RankingsScreen> {
     required dynamic userId,
     Map<String, dynamic>? podiumStats,
   }) {
-    final isTop3 = position <= 3;
-
     return Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: userId != null ? () => context.push('/users/$userId') : null,
-        child: Container(
-          decoration: isTop3
-              ? BoxDecoration(
-                  border: Border(
-                    left: BorderSide(
-                      color: _medalColor(position).withValues(alpha: 0.6),
-                      width: 3,
-                    ),
-                  ),
-                )
-              : null,
+        child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           child: Row(
             children: [
-              // Posição
-              SizedBox(
+              // Posição em círculo
+              Container(
                 width: 36,
-                child: _positionWidget(position),
+                height: 36,
+                decoration: BoxDecoration(
+                  color: AppTheme.surfaceColor,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Center(
+                  child: Text(
+                    '$position',
+                    style: GoogleFonts.exo2(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: AppTheme.textSecondary,
+                    ),
+                  ),
+                ),
               ),
               const SizedBox(width: 12),
               // Avatar
               CircleAvatar(
-                radius: isTop3 ? 20 : 18,
+                radius: 18,
                 backgroundColor: AppTheme.surfaceColor,
-                backgroundImage: avatar != null
-                    ? NetworkImage(avatar)
-                    : null,
+                backgroundImage: avatar != null ? NetworkImage(avatar) : null,
                 child: avatar == null
                     ? Text(
                         name.isNotEmpty ? name[0].toUpperCase() : '?',
                         style: TextStyle(
                             color: AppTheme.primaryGreen,
                             fontWeight: FontWeight.bold,
-                            fontSize: isTop3 ? 14 : 12),
+                            fontSize: 12),
                       )
                     : null,
               ),
@@ -368,8 +481,8 @@ class _RankingsScreenState extends State<RankingsScreen> {
                       children: [
                         Flexible(
                           child: Text(name,
-                              style: TextStyle(
-                                  fontWeight: isTop3 ? FontWeight.w700 : FontWeight.w500,
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.w500,
                                   fontSize: 14),
                               overflow: TextOverflow.ellipsis),
                         ),
@@ -394,11 +507,9 @@ class _RankingsScreenState extends State<RankingsScreen> {
                   Text(
                     '$points',
                     style: GoogleFonts.exo2(
-                      fontSize: isTop3 ? 20 : 17,
+                      fontSize: 17,
                       fontWeight: FontWeight.w800,
-                      color: isTop3
-                          ? _medalColor(position)
-                          : AppTheme.textPrimary,
+                      color: AppTheme.textPrimary,
                     ),
                   ),
                   const SizedBox(width: 3),
@@ -417,57 +528,35 @@ class _RankingsScreenState extends State<RankingsScreen> {
 
   Widget _buildFilterChip(String label, String filterKey) {
     final isActive = _activeFilter == filterKey;
-    return GestureDetector(
-      onTap: () => _setFilter(filterKey),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-        decoration: BoxDecoration(
-          color: isActive
-              ? AppTheme.primaryGreen.withValues(alpha: 0.12)
-              : AppTheme.surfaceColor,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () => _setFilter(filterKey),
+        borderRadius: BorderRadius.circular(10),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
             color: isActive
-                ? AppTheme.primaryGreen.withValues(alpha: 0.4)
-                : AppTheme.borderSubtle,
+                ? AppTheme.primaryGreen.withValues(alpha: 0.12)
+                : AppTheme.surfaceColor,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: isActive
+                  ? AppTheme.primaryGreen.withValues(alpha: 0.4)
+                  : AppTheme.borderSubtle,
+            ),
           ),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            color: isActive ? AppTheme.primaryGreen : AppTheme.textSecondary,
-            fontSize: 13,
-            fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
+          child: Text(
+            label,
+            style: TextStyle(
+              color: isActive ? AppTheme.primaryGreen : AppTheme.textSecondary,
+              fontSize: 13,
+              fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
+            ),
           ),
         ),
       ),
     );
-  }
-
-  Widget _positionWidget(int position) {
-    if (position <= 3) {
-      final icons = {1: '🥇', 2: '🥈', 3: '🥉'};
-      return Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(icons[position]!, style: const TextStyle(fontSize: 22)),
-        ],
-      );
-    }
-    return Text(
-      '$position',
-      style: GoogleFonts.exo2(
-          fontSize: 16,
-          fontWeight: FontWeight.w700,
-          color: AppTheme.textSecondary),
-      textAlign: TextAlign.center,
-    );
-  }
-
-  Color _medalColor(int position) {
-    if (position == 1) return const Color(0xFFFFD700);
-    if (position == 2) return const Color(0xFFC0C0C0);
-    return const Color(0xFFCD7F32);
   }
 }

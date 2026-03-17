@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/network/api_client.dart';
+import '../../../../shared/widgets/loading_shimmer.dart';
+import '../../../../shared/widgets/empty_state_widget.dart';
+import '../../../../shared/services/feedback_service.dart';
 
 /// Tela Admin — Gerenciar Equipes
 class AdminTeamsScreen extends StatefulWidget {
@@ -47,39 +51,50 @@ class _AdminTeamsScreenState extends State<AdminTeamsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return _loading
-        ? const Center(child: CircularProgressIndicator())
-        : Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+    if (_loading) {
+      return const ShimmerList(itemCount: 8, itemHeight: 64, padding: EdgeInsets.all(24));
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(24),
+          child: Row(
             children: [
-              Padding(
-                padding: const EdgeInsets.all(24),
-                child: Row(
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('Equipes', style: Theme.of(context).textTheme.headlineMedium),
-                          Text('${_teams.length} equipes cadastradas',
-                              style: Theme.of(context).textTheme.bodyMedium),
-                        ],
-                      ),
-                    ),
-                    IconButton(onPressed: _load, icon: const Icon(Icons.refresh)),
+                    Text('Equipes', style: Theme.of(context).textTheme.headlineMedium),
+                    Text('${_teams.length} equipes cadastradas',
+                        style: Theme.of(context).textTheme.bodyMedium),
                   ],
                 ),
               ),
-              Expanded(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
-                  child: Column(
-                    children: _teams.map((t) => _buildTeamCard(t)).toList(),
-                  ),
-                ),
-              ),
+              IconButton(onPressed: _load, icon: const Icon(Icons.refresh)),
             ],
-          );
+          ),
+        ),
+        Expanded(
+          child: _teams.isEmpty
+              ? const EmptyStateWidget(
+                  icon: Icons.groups_outlined,
+                  title: 'Nenhuma equipe',
+                  subtitle: 'Sincronize os pilotos para popular as equipes.',
+                )
+              : ListView.builder(
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  itemCount: _teams.length,
+                  itemBuilder: (context, i) {
+                    return _buildTeamCard(_teams[i])
+                        .animate()
+                        .fadeIn(duration: 200.ms, delay: (i * 40).ms);
+                  },
+                ),
+        ),
+      ],
+    );
   }
 
   Widget _buildTeamCard(dynamic team) {
@@ -95,6 +110,12 @@ class _AdminTeamsScreenState extends State<AdminTeamsScreen> {
           decoration: BoxDecoration(
             color: color,
             borderRadius: BorderRadius.circular(8),
+            boxShadow: [
+              BoxShadow(
+                color: color.withValues(alpha: 0.3),
+                blurRadius: 6,
+              ),
+            ],
           ),
         ),
         title: Text(team['name'] ?? '', style: const TextStyle(fontWeight: FontWeight.w600)),
@@ -109,6 +130,7 @@ class _AdminTeamsScreenState extends State<AdminTeamsScreen> {
               icon: const Icon(Icons.edit, size: 18),
               tooltip: 'Editar equipe',
               onPressed: () => _showEditModal(team),
+              constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
             ),
             const Icon(Icons.expand_more),
           ],
@@ -160,6 +182,7 @@ class _AdminTeamsScreenState extends State<AdminTeamsScreen> {
         icon: const Icon(Icons.swap_horiz, size: 22, color: AppTheme.primaryRed),
         tooltip: 'Trocar piloto',
         onPressed: () => _showSwapModal(team: team, currentDriver: driver),
+        constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
       ),
     );
   }
@@ -181,6 +204,7 @@ class _AdminTeamsScreenState extends State<AdminTeamsScreen> {
         icon: const Icon(Icons.add, size: 22),
         tooltip: 'Adicionar piloto',
         onPressed: () => _showSwapModal(team: team, currentDriver: null),
+        constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
       ),
     );
   }
@@ -190,12 +214,13 @@ class _AdminTeamsScreenState extends State<AdminTeamsScreen> {
     required dynamic currentDriver,
   }) async {
     String search = '';
+    final screenWidth = MediaQuery.of(context).size.width;
+    final dialogWidth = screenWidth < 600 ? screenWidth * 0.9 : 400.0;
 
     await showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDlg) {
-          // Exclude drivers already in this team
           final inTeam = ((team['team_drivers'] as List?) ?? [])
               .map<dynamic>((d) => d['id'])
               .toSet();
@@ -216,7 +241,7 @@ class _AdminTeamsScreenState extends State<AdminTeamsScreen> {
                   : 'Adicionar piloto — ${team['name']}',
             ),
             content: SizedBox(
-              width: 360,
+              width: dialogWidth,
               height: 440,
               child: Column(
                 children: [
@@ -299,7 +324,6 @@ class _AdminTeamsScreenState extends State<AdminTeamsScreen> {
   ) async {
     final newDriverTeamId = newDriver['team_id'];
 
-    // Find source team (if the new driver already belongs to a team)
     dynamic sourceTeam;
     if (newDriverTeamId != null) {
       for (final t in _teams) {
@@ -315,7 +339,6 @@ class _AdminTeamsScreenState extends State<AdminTeamsScreen> {
         : 0;
 
     if (sourceTeam != null && sourceCount >= 2) {
-      // Source team will be left with only 1 driver — show warning
       final sourceTeamName =
           (sourceTeam['name'] as String?) ?? 'equipe de origem';
 
@@ -368,13 +391,10 @@ class _AdminTeamsScreenState extends State<AdminTeamsScreen> {
       return;
     }
 
-    // Simple case — no warning needed
     final ok = await _applyDriverSwap(team, currentDriver, newDriver);
     if (ok) await _load();
   }
 
-  /// Assigns [newDriver] to [team] and removes [currentDriver] from the team.
-  /// Returns true on success.
   Future<bool> _applyDriverSwap(
     dynamic team,
     dynamic currentDriver,
@@ -386,25 +406,18 @@ class _AdminTeamsScreenState extends State<AdminTeamsScreen> {
 
     if (!res.success) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Erro: ${res.message}'),
-          backgroundColor: AppTheme.primaryRed,
-        ));
+        FeedbackService.error(context, 'Erro: ${res.message}');
       }
       return false;
     }
 
-    // Remove the replaced driver from the team
     if (currentDriver != null) {
       await _api.put('/admin/drivers/${currentDriver['id']}',
           body: {'teamId': null});
     }
 
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('Piloto atualizado!'),
-        backgroundColor: AppTheme.successGreen,
-      ));
+      FeedbackService.success(context, 'Piloto atualizado!');
     }
     return true;
   }
@@ -413,29 +426,34 @@ class _AdminTeamsScreenState extends State<AdminTeamsScreen> {
     final nameCtrl = TextEditingController(text: team['name'] ?? '');
     final colorCtrl =
         TextEditingController(text: team['color'] ?? '#000000');
+    final screenWidth = MediaQuery.of(context).size.width;
+    final dialogWidth = screenWidth < 600 ? screenWidth * 0.9 : 400.0;
 
     await showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: AppTheme.cardBackground,
         title: Text('Editar: ${team['name']}'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: nameCtrl,
-              decoration:
-                  const InputDecoration(labelText: 'Nome da Equipe'),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: colorCtrl,
-              decoration: const InputDecoration(
-                labelText: 'Cor (hex, ex: #E8002D)',
-                hintText: '#RRGGBB',
+        content: SizedBox(
+          width: dialogWidth,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: nameCtrl,
+                decoration:
+                    const InputDecoration(labelText: 'Nome da Equipe'),
               ),
-            ),
-          ],
+              const SizedBox(height: 12),
+              TextField(
+                controller: colorCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Cor (hex, ex: #E8002D)',
+                  hintText: '#RRGGBB',
+                ),
+              ),
+            ],
+          ),
         ),
         actions: [
           TextButton(
@@ -450,14 +468,12 @@ class _AdminTeamsScreenState extends State<AdminTeamsScreen> {
                     'color': colorCtrl.text,
                   });
               if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                  content: Text(res.success
-                      ? 'Equipe atualizada!'
-                      : 'Erro: ${res.message}'),
-                  backgroundColor:
-                      res.success ? AppTheme.successGreen : AppTheme.primaryRed,
-                ));
-                if (res.success) _load();
+                if (res.success) {
+                  FeedbackService.success(context, 'Equipe atualizada!');
+                  _load();
+                } else {
+                  FeedbackService.error(context, 'Erro: ${res.message}');
+                }
               }
             },
             child: const Text('Salvar'),

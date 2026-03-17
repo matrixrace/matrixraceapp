@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/network/api_client.dart';
+import '../../../../shared/widgets/loading_shimmer.dart';
+import '../../../../shared/widgets/empty_state_widget.dart';
+import '../../../../shared/services/feedback_service.dart';
 
 /// Tela Admin — Gerenciar Corridas (editar datas, status)
 class AdminRacesScreen extends StatefulWidget {
@@ -39,67 +43,77 @@ class _AdminRacesScreenState extends State<AdminRacesScreen> {
     final res = await _api.post('/admin/races/sync-schedule?year=$year');
     if (mounted) {
       setState(() => _syncing = false);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(res.success ? res.message : 'Erro: ${res.message}'),
-        backgroundColor: res.success ? AppTheme.successGreen : AppTheme.primaryRed,
-        duration: const Duration(seconds: 4),
-      ));
-      if (res.success) _load();
+      if (res.success) {
+        FeedbackService.success(context, res.message);
+        _load();
+      } else {
+        FeedbackService.error(context, 'Erro: ${res.message}');
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return _loading
-        ? const Center(child: CircularProgressIndicator())
-        : Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+    if (_loading) {
+      return const ShimmerList(itemCount: 8, itemHeight: 72, padding: EdgeInsets.all(24));
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(24),
+          child: Row(
             children: [
-              Padding(
-                padding: const EdgeInsets.all(24),
-                child: Row(
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('Corridas', style: Theme.of(context).textTheme.headlineMedium),
-                          Text('${_races.length} corridas cadastradas',
-                              style: Theme.of(context).textTheme.bodyMedium),
-                        ],
-                      ),
-                    ),
-                    if (_syncing)
-                      const SizedBox(
-                        width: 24,
-                        height: 24,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    else
-                      TextButton.icon(
-                        onPressed: _syncSchedule,
-                        icon: const Icon(Icons.sync, size: 16),
-                        label: Text('Sincronizar ${DateTime.now().year}'),
-                        style: TextButton.styleFrom(foregroundColor: AppTheme.primaryRed),
-                      ),
-                    IconButton(onPressed: _load, icon: const Icon(Icons.refresh)),
+                    Text('Corridas', style: Theme.of(context).textTheme.headlineMedium),
+                    Text('${_races.length} corridas cadastradas',
+                        style: Theme.of(context).textTheme.bodyMedium),
                   ],
                 ),
               ),
-              Expanded(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
-                  child: Column(
-                    children: _races.map((r) => _buildRaceCard(r)).toList(),
-                  ),
+              if (_syncing)
+                const SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              else
+                TextButton.icon(
+                  onPressed: _syncSchedule,
+                  icon: const Icon(Icons.sync, size: 16),
+                  label: Text('Sincronizar ${DateTime.now().year}'),
+                  style: TextButton.styleFrom(foregroundColor: AppTheme.primaryRed),
                 ),
-              ),
+              IconButton(onPressed: _load, icon: const Icon(Icons.refresh)),
             ],
-          );
+          ),
+        ),
+        Expanded(
+          child: _races.isEmpty
+              ? const EmptyStateWidget(
+                  icon: Icons.flag_outlined,
+                  title: 'Nenhuma corrida',
+                  subtitle: 'Sincronize o calendário F1 para importar as corridas.',
+                )
+              : ListView.builder(
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  itemCount: _races.length,
+                  itemBuilder: (context, i) {
+                    return _buildRaceCard(_races[i])
+                        .animate()
+                        .fadeIn(duration: 200.ms, delay: (i * 30).ms);
+                  },
+                ),
+        ),
+      ],
+    );
   }
 
   Widget _buildRaceCard(dynamic race) {
-    // Drizzle ORM retorna camelCase; pool.query retorna snake_case — suportamos os dois
     final isCompleted = race['isCompleted'] == true || race['is_completed'] == true;
     final raceDate  = _parseUtc(race['raceDate']       ?? race['race_date']);
     final fp1Date   = _parseUtc(race['fp1Date']        ?? race['fp1_date']);
@@ -136,13 +150,24 @@ class _AdminRacesScreenState extends State<AdminRacesScreen> {
                     : AppTheme.warningOrange.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: Text(
-                isCompleted ? 'Concluída' : 'Ativa',
-                style: TextStyle(
-                  color: isCompleted ? AppTheme.successGreen : AppTheme.warningOrange,
-                  fontSize: 11,
-                  fontWeight: FontWeight.bold,
-                ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    isCompleted ? Icons.check_circle : Icons.schedule,
+                    size: 12,
+                    color: isCompleted ? AppTheme.successGreen : AppTheme.warningOrange,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    isCompleted ? 'Concluída' : 'Ativa',
+                    style: TextStyle(
+                      color: isCompleted ? AppTheme.successGreen : AppTheme.warningOrange,
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
               ),
             ),
             const SizedBox(width: 8),
@@ -216,7 +241,6 @@ class _AdminRacesScreenState extends State<AdminRacesScreen> {
     );
   }
 
-  /// Converte string UTC do backend para DateTime local
   DateTime? _parseUtc(dynamic value) {
     if (value == null) return null;
     try {
@@ -226,7 +250,6 @@ class _AdminRacesScreenState extends State<AdminRacesScreen> {
     }
   }
 
-  /// Formata DateTime (já em horário local) como DD/MM/YYYY HH:MM
   String _fmt(DateTime? dt) {
     if (dt == null) return 'N/A';
     final d = dt.day.toString().padLeft(2, '0');
@@ -257,21 +280,21 @@ class _AdminRacesScreenState extends State<AdminRacesScreen> {
 
     final res = await _api.put('/admin/races/${race['id']}', body: {'isCompleted': true});
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(res.success ? 'Corrida marcada como concluída!' : 'Erro: ${res.message}'),
-          backgroundColor: res.success ? AppTheme.successGreen : AppTheme.primaryRed,
-        ),
-      );
-      if (res.success) _load();
+      if (res.success) {
+        FeedbackService.success(context, 'Corrida marcada como concluída!');
+        _load();
+      } else {
+        FeedbackService.error(context, 'Erro: ${res.message}');
+      }
     }
   }
 
   Future<void> _showEditModal(dynamic race) async {
-    // Inicializa com horário local (já convertido por _parseUtc)
     DateTime? fp1    = _parseUtc(race['fp1Date']        ?? race['fp1_date']);
     DateTime? quali  = _parseUtc(race['qualifyingDate'] ?? race['qualifying_date']);
     DateTime? raceDt = _parseUtc(race['raceDate']       ?? race['race_date']);
+    final screenWidth = MediaQuery.of(context).size.width;
+    final dialogWidth = screenWidth < 600 ? screenWidth * 0.9 : 420.0;
 
     await showDialog(
       context: context,
@@ -331,24 +354,27 @@ class _AdminRacesScreenState extends State<AdminRacesScreen> {
           return AlertDialog(
             backgroundColor: AppTheme.cardBackground,
             title: Text('Editar: ${race['name']}'),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      'Horários no seu fuso local',
-                      style: TextStyle(fontSize: 11, color: Colors.white38),
+            content: SizedBox(
+              width: dialogWidth,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        'Horários no seu fuso local',
+                        style: TextStyle(fontSize: 11, color: Colors.white38),
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 8),
-                  dtTile('TL1', fp1,   (v) => fp1 = v),
-                  const Divider(height: 1),
-                  dtTile('Qualificação', quali, (v) => quali = v),
-                  const Divider(height: 1),
-                  dtTile('Corrida *', raceDt,  (v) => raceDt = v),
-                ],
+                    const SizedBox(height: 8),
+                    dtTile('TL1', fp1,   (v) => fp1 = v),
+                    const Divider(height: 1),
+                    dtTile('Qualificação', quali, (v) => quali = v),
+                    const Divider(height: 1),
+                    dtTile('Corrida *', raceDt,  (v) => raceDt = v),
+                  ],
+                ),
               ),
             ),
             actions: [
@@ -365,11 +391,12 @@ class _AdminRacesScreenState extends State<AdminRacesScreen> {
                         if (quali != null) body['qualifyingDate'] = quali!.toUtc().toIso8601String();
                         final res = await _api.put('/admin/races/${race['id']}', body: body);
                         if (mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                            content: Text(res.success ? 'Corrida atualizada!' : 'Erro: ${res.message}'),
-                            backgroundColor: res.success ? AppTheme.successGreen : AppTheme.primaryRed,
-                          ));
-                          if (res.success) _load();
+                          if (res.success) {
+                            FeedbackService.success(context, 'Corrida atualizada!');
+                            _load();
+                          } else {
+                            FeedbackService.error(context, 'Erro: ${res.message}');
+                          }
                         }
                       },
                 child: const Text('Salvar'),

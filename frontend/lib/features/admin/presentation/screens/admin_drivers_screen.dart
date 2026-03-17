@@ -5,9 +5,13 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:http/http.dart' as http;
+import 'package:flutter_animate/flutter_animate.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/config/app_config.dart';
+import '../../../../shared/widgets/loading_shimmer.dart';
+import '../../../../shared/widgets/empty_state_widget.dart';
+import '../../../../shared/services/feedback_service.dart';
 
 /// Tela Admin — Gerenciar Pilotos
 class AdminDriversScreen extends StatefulWidget {
@@ -37,11 +41,12 @@ class _AdminDriversScreenState extends State<AdminDriversScreen> {
     final res = await _api.post('/admin/drivers/sync?year=$year');
     if (mounted) {
       setState(() => _syncing = false);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(res.success ? res.message : 'Erro: ${res.message}'),
-        backgroundColor: res.success ? AppTheme.successGreen : AppTheme.primaryRed,
-      ));
-      if (res.success) _load();
+      if (res.success) {
+        FeedbackService.success(context, res.message);
+        _load();
+      } else {
+        FeedbackService.error(context, 'Erro: ${res.message}');
+      }
     }
   }
 
@@ -69,63 +74,74 @@ class _AdminDriversScreenState extends State<AdminDriversScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return _loading
-        ? const Center(child: CircularProgressIndicator())
-        : Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+    if (_loading) {
+      return const ShimmerList(itemCount: 10, itemHeight: 64, padding: EdgeInsets.all(24));
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(24),
+          child: Row(
             children: [
-              Padding(
-                padding: const EdgeInsets.all(24),
-                child: Row(
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('Pilotos', style: Theme.of(context).textTheme.headlineMedium),
-                          Text('${_drivers.length} pilotos cadastrados',
-                              style: Theme.of(context).textTheme.bodyMedium),
-                        ],
-                      ),
-                    ),
-                    if (_syncing)
-                      const SizedBox(
-                        width: 24, height: 24,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    else
-                      TextButton.icon(
-                        onPressed: _syncDrivers,
-                        icon: const Icon(Icons.sync, size: 16),
-                        label: Text('Sincronizar ${DateTime.now().year}'),
-                        style: TextButton.styleFrom(foregroundColor: AppTheme.primaryRed),
-                      ),
-                    IconButton(onPressed: _load, icon: const Icon(Icons.refresh)),
+                    Text('Pilotos', style: Theme.of(context).textTheme.headlineMedium),
+                    Text('${_drivers.length} pilotos cadastrados',
+                        style: Theme.of(context).textTheme.bodyMedium),
                   ],
                 ),
               ),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24),
-                child: TextField(
-                  onChanged: (v) => setState(() => _search = v),
-                  decoration: const InputDecoration(
-                    hintText: 'Buscar por nome ou número...',
-                    prefixIcon: Icon(Icons.search),
-                    contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                  ),
+              if (_syncing)
+                const SizedBox(
+                  width: 24, height: 24,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              else
+                TextButton.icon(
+                  onPressed: _syncDrivers,
+                  icon: const Icon(Icons.sync, size: 16),
+                  label: Text('Sincronizar ${DateTime.now().year}'),
+                  style: TextButton.styleFrom(foregroundColor: AppTheme.primaryRed),
                 ),
-              ),
-              const SizedBox(height: 12),
-              Expanded(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
-                  child: Column(
-                    children: _filtered.map((d) => _buildDriverCard(d)).toList(),
-                  ),
-                ),
-              ),
+              IconButton(onPressed: _load, icon: const Icon(Icons.refresh)),
             ],
-          );
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          child: TextField(
+            onChanged: (v) => setState(() => _search = v),
+            decoration: const InputDecoration(
+              hintText: 'Buscar por nome ou número...',
+              prefixIcon: Icon(Icons.search),
+              contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        Expanded(
+          child: _filtered.isEmpty
+              ? const EmptyStateWidget(
+                  icon: Icons.person_off_outlined,
+                  title: 'Nenhum piloto encontrado',
+                  subtitle: 'Tente outro termo de busca ou sincronize os pilotos.',
+                )
+              : ListView.builder(
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  itemCount: _filtered.length,
+                  itemBuilder: (context, i) {
+                    return _buildDriverCard(_filtered[i])
+                        .animate()
+                        .fadeIn(duration: 200.ms, delay: (i * 25).ms);
+                  },
+                ),
+        ),
+      ],
+    );
   }
 
   Widget _buildDriverCard(dynamic d) {
@@ -163,19 +179,31 @@ class _AdminDriversScreenState extends State<AdminDriversScreen> {
                     : Colors.grey.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(6),
               ),
-              child: Text(
-                isActive ? 'Ativo' : 'Inativo',
-                style: TextStyle(
-                  color: isActive ? AppTheme.successGreen : Colors.grey,
-                  fontSize: 10,
-                  fontWeight: FontWeight.bold,
-                ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    isActive ? Icons.check_circle : Icons.cancel,
+                    size: 10,
+                    color: isActive ? AppTheme.successGreen : Colors.grey,
+                  ),
+                  const SizedBox(width: 3),
+                  Text(
+                    isActive ? 'Ativo' : 'Inativo',
+                    style: TextStyle(
+                      color: isActive ? AppTheme.successGreen : Colors.grey,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
               ),
             ),
             IconButton(
               icon: const Icon(Icons.edit, size: 18),
               onPressed: () => _showEditModal(d),
               tooltip: 'Editar',
+              constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
             ),
           ],
         ),
@@ -193,6 +221,8 @@ class _AdminDriversScreenState extends State<AdminDriversScreen> {
     bool isActive = driver['is_active'] == true;
     String? localPhotoUrl = driver['photo_url'] as String?;
     bool uploadingPhoto = false;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final dialogWidth = screenWidth < 600 ? screenWidth * 0.9 : 460.0;
 
     await showDialog(
       context: context,
@@ -269,125 +299,128 @@ class _AdminDriversScreenState extends State<AdminDriversScreen> {
             backgroundColor: AppTheme.cardBackground,
             title: Text(
                 'Editar: ${driver['first_name']} ${driver['last_name']}'),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // ── Foto ────────────────────────────────────
-                  Center(
-                    child: Column(
-                      children: [
-                        CircleAvatar(
-                          radius: 40,
-                          backgroundColor: AppTheme.surfaceColor,
-                          backgroundImage: localPhotoUrl != null
-                              ? NetworkImage(localPhotoUrl!)
-                              : null,
-                          child: localPhotoUrl == null
-                              ? Text(
-                                  initials,
-                                  style: const TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                    color: AppTheme.primaryRed,
-                                  ),
-                                )
-                              : null,
-                        ),
-                        const SizedBox(height: 8),
-                        if (uploadingPhoto)
-                          const SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(
-                                strokeWidth: 2),
-                          )
-                        else
-                          TextButton.icon(
-                            onPressed: pickAndUpload,
-                            icon: const Icon(Icons.photo_camera,
-                                size: 16),
-                            label: const Text('Alterar Foto',
-                                style: TextStyle(fontSize: 12)),
-                            style: TextButton.styleFrom(
-                                foregroundColor: AppTheme.primaryRed),
+            content: SizedBox(
+              width: dialogWidth,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // ── Foto ────────────────────────────────────
+                    Center(
+                      child: Column(
+                        children: [
+                          CircleAvatar(
+                            radius: 40,
+                            backgroundColor: AppTheme.surfaceColor,
+                            backgroundImage: localPhotoUrl != null
+                                ? NetworkImage(localPhotoUrl!)
+                                : null,
+                            child: localPhotoUrl == null
+                                ? Text(
+                                    initials,
+                                    style: const TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                      color: AppTheme.primaryRed,
+                                    ),
+                                  )
+                                : null,
                           ),
+                          const SizedBox(height: 8),
+                          if (uploadingPhoto)
+                            const SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(
+                                  strokeWidth: 2),
+                            )
+                          else
+                            TextButton.icon(
+                              onPressed: pickAndUpload,
+                              icon: const Icon(Icons.photo_camera,
+                                  size: 16),
+                              label: const Text('Alterar Foto',
+                                  style: TextStyle(fontSize: 12)),
+                              style: TextButton.styleFrom(
+                                  foregroundColor: AppTheme.primaryRed),
+                            ),
+                        ],
+                      ),
+                    ),
+                    const Divider(),
+                    // ── Campos ──────────────────────────────────
+                    TextField(
+                      controller: firstCtrl,
+                      decoration:
+                          const InputDecoration(labelText: 'Nome'),
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: lastCtrl,
+                      decoration: const InputDecoration(
+                          labelText: 'Sobrenome'),
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: numCtrl,
+                      decoration: const InputDecoration(
+                          labelText: 'Número'),
+                      keyboardType: TextInputType.number,
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: countryCtrl,
+                      decoration: const InputDecoration(
+                          labelText: 'País'),
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: abbrevCtrl,
+                      decoration: const InputDecoration(
+                          labelText: 'Abreviação (ex: HAM)'),
+                      maxLength: 3,
+                      textCapitalization: TextCapitalization.characters,
+                    ),
+                    const SizedBox(height: 8),
+                    DropdownButtonFormField<String>(
+                      initialValue: selectedTeamId,
+                      decoration:
+                          const InputDecoration(labelText: 'Equipe'),
+                      dropdownColor: AppTheme.surfaceColor,
+                      items: [
+                        const DropdownMenuItem<String>(
+                          value: null,
+                          child: Text('Sem equipe',
+                              style: TextStyle(fontSize: 13)),
+                        ),
+                        ..._teams.map<DropdownMenuItem<String>>((t) {
+                          return DropdownMenuItem<String>(
+                            value: t['id'].toString(),
+                            child: Text(t['name'] ?? '',
+                                style:
+                                    const TextStyle(fontSize: 13)),
+                          );
+                        }),
+                      ],
+                      onChanged: (v) =>
+                          setDlg(() => selectedTeamId = v),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        const Text('Ativo',
+                            style: TextStyle(fontSize: 13)),
+                        const Spacer(),
+                        Switch(
+                          value: isActive,
+                          activeThumbColor: AppTheme.primaryRed,
+                          onChanged: (v) =>
+                              setDlg(() => isActive = v),
+                        ),
                       ],
                     ),
-                  ),
-                  const Divider(),
-                  // ── Campos ──────────────────────────────────
-                  TextField(
-                    controller: firstCtrl,
-                    decoration:
-                        const InputDecoration(labelText: 'Nome'),
-                  ),
-                  const SizedBox(height: 8),
-                  TextField(
-                    controller: lastCtrl,
-                    decoration: const InputDecoration(
-                        labelText: 'Sobrenome'),
-                  ),
-                  const SizedBox(height: 8),
-                  TextField(
-                    controller: numCtrl,
-                    decoration: const InputDecoration(
-                        labelText: 'Número'),
-                    keyboardType: TextInputType.number,
-                  ),
-                  const SizedBox(height: 8),
-                  TextField(
-                    controller: countryCtrl,
-                    decoration: const InputDecoration(
-                        labelText: 'País'),
-                  ),
-                  const SizedBox(height: 8),
-                  TextField(
-                    controller: abbrevCtrl,
-                    decoration: const InputDecoration(
-                        labelText: 'Abreviação (ex: HAM)'),
-                    maxLength: 3,
-                    textCapitalization: TextCapitalization.characters,
-                  ),
-                  const SizedBox(height: 8),
-                  DropdownButtonFormField<String>(
-                    initialValue: selectedTeamId,
-                    decoration:
-                        const InputDecoration(labelText: 'Equipe'),
-                    dropdownColor: AppTheme.surfaceColor,
-                    items: [
-                      const DropdownMenuItem<String>(
-                        value: null,
-                        child: Text('Sem equipe',
-                            style: TextStyle(fontSize: 13)),
-                      ),
-                      ..._teams.map<DropdownMenuItem<String>>((t) {
-                        return DropdownMenuItem<String>(
-                          value: t['id'].toString(),
-                          child: Text(t['name'] ?? '',
-                              style:
-                                  const TextStyle(fontSize: 13)),
-                        );
-                      }),
-                    ],
-                    onChanged: (v) =>
-                        setDlg(() => selectedTeamId = v),
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      const Text('Ativo',
-                          style: TextStyle(fontSize: 13)),
-                      const Spacer(),
-                      Switch(
-                        value: isActive,
-                        activeThumbColor: AppTheme.primaryRed,
-                        onChanged: (v) =>
-                            setDlg(() => isActive = v),
-                      ),
-                    ],
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
             actions: [
@@ -413,17 +446,12 @@ class _AdminDriversScreenState extends State<AdminDriversScreen> {
                       '/admin/drivers/${driver['id']}',
                       body: body);
                   if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(res.success
-                            ? 'Piloto atualizado!'
-                            : 'Erro: ${res.message}'),
-                        backgroundColor: res.success
-                            ? AppTheme.successGreen
-                            : AppTheme.primaryRed,
-                      ),
-                    );
-                    if (res.success) _load();
+                    if (res.success) {
+                      FeedbackService.success(context, 'Piloto atualizado!');
+                      _load();
+                    } else {
+                      FeedbackService.error(context, 'Erro: ${res.message}');
+                    }
                   }
                 },
                 child: const Text('Salvar'),

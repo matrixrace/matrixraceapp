@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../shared/widgets/empty_state_widget.dart';
+import '../../../../shared/widgets/loading_shimmer.dart';
 
 /// Tela de notificações do usuário
 class NotificationsScreen extends StatefulWidget {
@@ -51,7 +54,6 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     }
   }
 
-  /// Navega para a tela correta ao tocar em uma notificação
   Future<void> _onTapNotification(Map<String, dynamic> notif, int index) async {
     final id = notif['id'] as String;
     final type = notif['type'] as String? ?? '';
@@ -101,103 +103,169 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         title: const Text('Notificações'),
         actions: [
           if (unreadCount > 0)
-            TextButton(
+            TextButton.icon(
               onPressed: _markAllRead,
-              child: const Text('Marcar todas como lidas'),
+              icon: const Icon(Icons.done_all, size: 18),
+              label: const Text('Ler todas'),
             ),
         ],
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? const ShimmerList(itemCount: 6, itemHeight: 72)
           : RefreshIndicator(
               onRefresh: _loadNotifications,
               child: _notifications.isEmpty
-                  ? const Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.notifications_none, size: 64, color: AppTheme.textSecondary),
-                          SizedBox(height: 12),
-                          Text('Nenhuma notificação.', style: TextStyle(color: AppTheme.textSecondary)),
-                        ],
-                      ),
+                  ? ListView(
+                      children: const [
+                        SizedBox(height: 80),
+                        EmptyStateWidget(
+                          icon: Icons.notifications_none,
+                          title: 'Tudo em dia!',
+                          subtitle: 'Você não tem notificações no momento.',
+                        ),
+                      ],
                     )
-                  : ListView.separated(
+                  : ListView.builder(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
                       itemCount: _notifications.length,
-                      separatorBuilder: (_, __) => const Divider(height: 1),
                       itemBuilder: (context, i) {
                         final notif = _notifications[i] as Map<String, dynamic>;
-                        final isRead = notif['isRead'] == true;
-                        final type = notif['type'] as String? ?? '';
-                        final title = notif['title'] as String? ?? '';
-                        final body = notif['body'] as String? ?? '';
-                        final isNavigable = _isNavigable(type);
-
-                        return InkWell(
-                          onTap: () => _onTapNotification(notif, i),
-                          child: Container(
-                            color: isRead ? null : AppTheme.primaryRed.withValues(alpha: 0.06),
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.all(8),
-                                  decoration: const BoxDecoration(
-                                    color: AppTheme.surfaceColor,
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: Icon(
-                                    _iconForType(type),
-                                    color: AppTheme.primaryRed,
-                                    size: 20,
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Row(
-                                        children: [
-                                          Expanded(
-                                            child: Text(title,
-                                                style: TextStyle(
-                                                    fontWeight: isRead
-                                                        ? FontWeight.normal
-                                                        : FontWeight.bold,
-                                                    fontSize: 14)),
-                                          ),
-                                          if (!isRead)
-                                            Container(
-                                              width: 8,
-                                              height: 8,
-                                              decoration: const BoxDecoration(
-                                                  color: AppTheme.primaryRed,
-                                                  shape: BoxShape.circle),
-                                            ),
-                                          if (isNavigable)
-                                            const Icon(Icons.chevron_right,
-                                                color: AppTheme.textSecondary, size: 16),
-                                        ],
-                                      ),
-                                      if (body.isNotEmpty) ...[
-                                        const SizedBox(height: 2),
-                                        Text(body,
-                                            style: const TextStyle(
-                                                color: AppTheme.textSecondary, fontSize: 13)),
-                                      ],
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        );
+                        return _buildNotificationItem(notif, i);
                       },
                     ),
             ),
     );
+  }
+
+  Widget _buildNotificationItem(Map<String, dynamic> notif, int index) {
+    final isRead = notif['isRead'] == true;
+    final type = notif['type'] as String? ?? '';
+    final title = notif['title'] as String? ?? '';
+    final body = notif['body'] as String? ?? '';
+    final isNavigable = _isNavigable(type);
+    final iconData = _iconForType(type);
+    final iconColor = _colorForType(type);
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 3),
+      decoration: BoxDecoration(
+        color: AppTheme.cardBackground,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: isRead ? AppTheme.borderSubtle : iconColor.withValues(alpha: 0.2),
+        ),
+      ),
+      child: IntrinsicHeight(
+        child: Row(
+          children: [
+            // Barra colorida na esquerda para unread
+            if (!isRead)
+              Container(
+                width: 4,
+                decoration: BoxDecoration(
+                  color: iconColor,
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(14),
+                    bottomLeft: Radius.circular(14),
+                  ),
+                ),
+              ),
+            Expanded(
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(14),
+                  onTap: () => _onTapNotification(notif, index),
+                  child: Padding(
+                    padding: EdgeInsets.only(
+                      left: isRead ? 14 : 10,
+                      right: 14,
+                      top: 14,
+                      bottom: 14,
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Ícone por tipo
+                        Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            color: iconColor.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: iconColor.withValues(alpha: 0.2),
+                            ),
+                          ),
+                          child: Icon(iconData, color: iconColor, size: 20),
+                        ),
+                        const SizedBox(width: 12),
+                        // Conteúdo
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                title,
+                                style: TextStyle(
+                                  fontWeight: isRead ? FontWeight.w500 : FontWeight.w700,
+                                  fontSize: 14,
+                                  color: isRead ? AppTheme.textPrimary : AppTheme.textPrimary,
+                                ),
+                              ),
+                              if (body.isNotEmpty) ...[
+                                const SizedBox(height: 3),
+                                Text(
+                                  body,
+                                  style: const TextStyle(
+                                    color: AppTheme.textSecondary,
+                                    fontSize: 13,
+                                    height: 1.3,
+                                  ),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        // Indicadores
+                        Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            if (!isRead)
+                              Container(
+                                width: 8,
+                                height: 8,
+                                decoration: BoxDecoration(
+                                  color: iconColor,
+                                  shape: BoxShape.circle,
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: iconColor.withValues(alpha: 0.4),
+                                      blurRadius: 6,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            if (isNavigable) ...[
+                              if (!isRead) const SizedBox(height: 6),
+                              Icon(Icons.chevron_right,
+                                  color: AppTheme.textSecondary, size: 18),
+                            ],
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    ).animate().fadeIn(duration: 200.ms, delay: (index * 40).ms);
   }
 
   IconData _iconForType(String type) {
@@ -212,6 +280,21 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         return Icons.groups_outlined;
       default:
         return Icons.notifications_outlined;
+    }
+  }
+
+  Color _colorForType(String type) {
+    switch (type) {
+      case 'friend_request':
+        return AppTheme.accentCyan;
+      case 'friend_accepted':
+        return AppTheme.primaryGreen;
+      case 'new_message':
+        return AppTheme.accentGold;
+      case 'league_message':
+        return AppTheme.warningOrange;
+      default:
+        return AppTheme.primaryGreen;
     }
   }
 }

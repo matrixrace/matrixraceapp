@@ -146,6 +146,64 @@ class AppTheme {
     border: Border.all(color: color.withValues(alpha: 0.4)),
   );
 
+  /// Gradiente para posições de pódio (1°, 2°, 3°)
+  static LinearGradient podiumGradient(int position) {
+    switch (position) {
+      case 1:
+        return const LinearGradient(
+          colors: [Color(0xFFFFD700), Color(0xFFFFA000)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        );
+      case 2:
+        return const LinearGradient(
+          colors: [Color(0xFFC0C0C0), Color(0xFF9E9E9E)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        );
+      case 3:
+        return const LinearGradient(
+          colors: [Color(0xFFCD7F32), Color(0xFFA0522D)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        );
+      default:
+        return const LinearGradient(
+          colors: [Color(0xFF2A2F3A), Color(0xFF1E2536)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        );
+    }
+  }
+
+  /// Cor do pódio por posição
+  static Color podiumColor(int position) {
+    switch (position) {
+      case 1: return const Color(0xFFFFD700);
+      case 2: return const Color(0xFFC0C0C0);
+      case 3: return const Color(0xFFCD7F32);
+      default: return textSecondary;
+    }
+  }
+
+  /// Borda com efeito neon/glow
+  static BoxDecoration neonBorder({
+    Color color = primaryGreen,
+    double radius = 16,
+    double borderWidth = 1.5,
+  }) => BoxDecoration(
+    color: cardBackground,
+    borderRadius: BorderRadius.circular(radius),
+    border: Border.all(color: color, width: borderWidth),
+    boxShadow: [
+      BoxShadow(
+        color: color.withValues(alpha: 0.2),
+        blurRadius: 12,
+        spreadRadius: 0,
+      ),
+    ],
+  );
+
   // ═════════════════════════════════════════════════════════════════════════
   //  TEMA
   // ═════════════════════════════════════════════════════════════════════════

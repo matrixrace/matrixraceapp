@@ -25,6 +25,18 @@ import '../features/live/presentation/screens/live_screen.dart';
 
 /// Configuração de rotas do app
 class AppRouter {
+  /// Transição suave de fade para navegação entre telas secundárias
+  static CustomTransitionPage<void> _fadeTransition(GoRouterState state, Widget child) {
+    return CustomTransitionPage<void>(
+      key: state.pageKey,
+      child: child,
+      transitionsBuilder: (context, animation, secondaryAnimation, child) {
+        return FadeTransition(opacity: animation, child: child);
+      },
+      transitionDuration: const Duration(milliseconds: 250),
+    );
+  }
+
   static final GoRouter router = GoRouter(
     initialLocation: '/',
     routes: [
@@ -72,14 +84,14 @@ class AppRouter {
       // ── Telas secundárias (AppBar próprio, sem bottom nav) ───
       GoRoute(
         path: '/leagues/create',
-        builder: (context, state) => const CreateLeagueScreen(),
+        pageBuilder: (context, state) => _fadeTransition(state, const CreateLeagueScreen()),
       ),
       GoRoute(
         path: '/leagues/:id',
-        builder: (context, state) => LeagueDetailScreen(
+        pageBuilder: (context, state) => _fadeTransition(state, LeagueDetailScreen(
           leagueId: state.pathParameters['id']!,
           isMemberHint: state.extra as bool?,
-        ),
+        )),
       ),
       GoRoute(
         path: '/leagues/:id/chat',
@@ -90,15 +102,15 @@ class AppRouter {
       ),
       GoRoute(
         path: '/predictions/:raceId',
-        builder: (context, state) => PredictionScreen(
+        pageBuilder: (context, state) => _fadeTransition(state, PredictionScreen(
           raceId: state.pathParameters['raceId']!,
-        ),
+        )),
       ),
       GoRoute(
         path: '/predictions-view/:raceId',
-        builder: (context, state) => PredictionViewScreen(
+        pageBuilder: (context, state) => _fadeTransition(state, PredictionViewScreen(
           raceId: state.pathParameters['raceId']!,
-        ),
+        )),
       ),
       GoRoute(
         path: '/predictions-edit-order/:raceId',
@@ -133,7 +145,7 @@ class AppRouter {
       ),
       GoRoute(
         path: '/notifications',
-        builder: (context, state) => const NotificationsScreen(),
+        pageBuilder: (context, state) => _fadeTransition(state, const NotificationsScreen()),
       ),
       GoRoute(
         path: '/how-it-works',
