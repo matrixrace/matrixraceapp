@@ -455,8 +455,9 @@ class _LiveScreenState extends State<LiveScreen> with SingleTickerProviderStateM
 
           // Destaque para top 3
           Color? rowBg;
-          if (pos == 1) rowBg = const Color(0xFFFFD700).withValues(alpha: 0.04);
-          else if (pos == 2) rowBg = const Color(0xFFC0C0C0).withValues(alpha: 0.04);
+          if (pos == 1) {
+            rowBg = const Color(0xFFFFD700).withValues(alpha: 0.04);
+          } else if (pos == 2) rowBg = const Color(0xFFC0C0C0).withValues(alpha: 0.04);
           else if (pos == 3) rowBg = const Color(0xFFCD7F32).withValues(alpha: 0.04);
 
           return DataRow(

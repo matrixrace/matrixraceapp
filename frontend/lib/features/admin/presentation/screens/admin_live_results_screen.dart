@@ -97,7 +97,7 @@ class _AdminLiveResultsScreenState extends State<AdminLiveResultsScreen>
       if (mounted && res.success) {
         _showSnack('Auto-refresh ativado (30s)', Colors.green);
       } else if (mounted) {
-        _showSnack(res.message ?? 'Erro ao ativar', Colors.red);
+        _showSnack(res.message, Colors.red);
       }
     }
 
@@ -251,7 +251,7 @@ class _AdminLiveResultsScreenState extends State<AdminLiveResultsScreen>
       _showSnack('Sessao ${_sessionLabel(sessionType)} salva!', Colors.green);
       await _loadSessionData();
     } else {
-      _showSnack(res.message ?? 'Erro ao salvar', Colors.red);
+      _showSnack(res.message, Colors.red);
     }
   }
 
@@ -287,7 +287,7 @@ class _AdminLiveResultsScreenState extends State<AdminLiveResultsScreen>
       _showSnack('Pontuacoes calculadas com sucesso!', Colors.green);
       _loadSessionData();
     } else {
-      _showSnack(res.message ?? 'Erro ao finalizar', Colors.red);
+      _showSnack(res.message, Colors.red);
     }
   }
 
@@ -307,7 +307,7 @@ class _AdminLiveResultsScreenState extends State<AdminLiveResultsScreen>
       await _loadSessionData();
       _loadRaces();
     } else {
-      _showSnack(res.message ?? 'Erro', Colors.red);
+      _showSnack(res.message, Colors.red);
     }
   }
 
@@ -324,7 +324,7 @@ class _AdminLiveResultsScreenState extends State<AdminLiveResultsScreen>
         _loadSessionData();
       }
     } else {
-      _showSnack(res.message ?? 'Erro ao sincronizar', Colors.red);
+      _showSnack(res.message, Colors.red);
     }
   }
 
@@ -386,7 +386,7 @@ class _AdminLiveResultsScreenState extends State<AdminLiveResultsScreen>
       }
       await _loadSessionData();
     } else {
-      _showSnack(res.message ?? 'Erro ao atualizar', Colors.red);
+      _showSnack(res.message, Colors.red);
     }
   }
 
