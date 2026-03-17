@@ -282,19 +282,10 @@ class _LoginScreenState extends State<LoginScreen>
 
   Widget _buildBackground() {
     return Positioned.fill(
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          gradient: RadialGradient(
-            center: const Alignment(-0.5, -0.8),
-            radius: 1.5,
-            colors: [
-              AppTheme.primaryGreen.withValues(alpha: 0.06),
-              AppTheme.darkBackground,
-            ],
-          ),
-        ),
+      child: Container(
+        color: AppTheme.darkBackground,
         child: CustomPaint(
-          painter: _GridPatternPainter(),
+          painter: _CheckeredFlagPainter(),
         ),
       ),
     );
@@ -332,22 +323,45 @@ class _LoginScreenState extends State<LoginScreen>
   }
 }
 
-/// Grid sutil de fundo inspirado em circuito de corrida
-class _GridPatternPainter extends CustomPainter {
+/// Padrão de bandeira quadriculada (checkered flag) sutil no fundo
+class _CheckeredFlagPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = AppTheme.primaryGreen.withValues(alpha: 0.03)
-      ..strokeWidth = 0.5
-      ..style = PaintingStyle.stroke;
+    const cellSize = 40.0;
+    final darkPaint = Paint()..color = const Color(0xFF0A0E17);
+    final lightPaint = Paint()..color = const Color(0xFF0E1320);
 
-    const step = 60.0;
-    for (double x = 0; x < size.width; x += step) {
-      canvas.drawLine(Offset(x, 0), Offset(x, size.height), paint);
+    final cols = (size.width / cellSize).ceil() + 1;
+    final rows = (size.height / cellSize).ceil() + 1;
+
+    for (int row = 0; row < rows; row++) {
+      for (int col = 0; col < cols; col++) {
+        final isLight = (row + col) % 2 == 0;
+        canvas.drawRect(
+          Rect.fromLTWH(col * cellSize, row * cellSize, cellSize, cellSize),
+          isLight ? lightPaint : darkPaint,
+        );
+      }
     }
-    for (double y = 0; y < size.height; y += step) {
-      canvas.drawLine(Offset(0, y), Offset(size.width, y), paint);
-    }
+
+    // Fade para escuro nas bordas inferior e superior para não competir com o conteúdo
+    final fadeTop = Paint()
+      ..shader = const LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [Color(0xFF080B12), Color(0x00080B12)],
+        stops: [0.0, 0.15],
+      ).createShader(Rect.fromLTWH(0, 0, size.width, size.height));
+    canvas.drawRect(Rect.fromLTWH(0, 0, size.width, size.height), fadeTop);
+
+    final fadeBottom = Paint()
+      ..shader = LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [const Color(0x00080B12), const Color(0xFF080B12)],
+        stops: const [0.7, 1.0],
+      ).createShader(Rect.fromLTWH(0, 0, size.width, size.height));
+    canvas.drawRect(Rect.fromLTWH(0, 0, size.width, size.height), fadeBottom);
   }
 
   @override
