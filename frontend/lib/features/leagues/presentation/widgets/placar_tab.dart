@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../../../../../core/network/api_client.dart';
 import '../../../../../core/theme/app_theme.dart';
 import '../../../../../core/widgets/podium_badges.dart';
@@ -259,9 +260,9 @@ class _PlacarTabState extends State<PlacarTab>
       children: [
         Text(
           '$total',
-          style: TextStyle(
+          style: GoogleFonts.exo2(
             fontSize: 18,
-            fontWeight: FontWeight.bold,
+            fontWeight: FontWeight.w800,
             color: isProvisional
                 ? Colors.orange
                 : position <= 3

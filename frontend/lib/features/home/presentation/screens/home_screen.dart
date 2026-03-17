@@ -2,6 +2,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:shimmer/shimmer.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/tutorial/tutorial_bloc.dart';
@@ -22,7 +24,7 @@ class _HomeScreenState extends State<HomeScreen> {
   List<dynamic> _upcomingRaces = [];
   bool _isLoading = true;
   final Set<int> _predictedRaceIds = {};
-  final Set<int> _unappliedRaceIds = {}; // palpites não aplicados a nenhuma liga
+  final Set<int> _unappliedRaceIds = {};
   Timer? _countdownTimer;
 
   @override
@@ -41,7 +43,6 @@ class _HomeScreenState extends State<HomeScreen> {
     super.dispose();
   }
 
-  // Retorna o tempo restante até [target]
   ({int days, int hours, int minutes, int seconds, bool started}) _timeUntil(DateTime? target) {
     if (target == null) return (days: 0, hours: 0, minutes: 0, seconds: 0, started: true);
     final diff = target.difference(DateTime.now());
@@ -57,23 +58,19 @@ class _HomeScreenState extends State<HomeScreen> {
 
   String _twoDigits(int n) => n.toString().padLeft(2, '0');
 
-  // Formata um DateTime como DD/MM/YYYY
   String _fmtDate(DateTime dt) =>
       '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}';
 
-  // Retorna "DD/MM/YYYY – DD/MM/YYYY" ou só uma data se a outra for nula
   String _dateRange(DateTime? start, DateTime? end) {
     if (start == null && end == null) return '';
     if (start == null) return _fmtDate(end!);
     if (end == null) return _fmtDate(start);
-    // Se mesma data, mostra só uma
     if (start.year == end.year && start.month == end.month && start.day == end.day) {
       return _fmtDate(start);
     }
     return '${_fmtDate(start)} – ${_fmtDate(end)}';
   }
 
-  // Parseia datas do backend (suporta camelCase e snake_case)
   DateTime? _parse(dynamic race, String camel, String snake) =>
       DateTime.tryParse(race[camel] ?? race[snake] ?? '')?.toLocal();
 
@@ -124,9 +121,39 @@ class _HomeScreenState extends State<HomeScreen> {
         await _loadUpcomingRaces();
         await _loadMyPredictions();
       },
-      child: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _buildContent(),
+      child: _isLoading ? _buildShimmer() : _buildContent(),
+    );
+  }
+
+  Widget _buildShimmer() {
+    return Shimmer.fromColors(
+      baseColor: AppTheme.cardBackground,
+      highlightColor: AppTheme.surfaceColor,
+      child: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          Container(
+            height: 260,
+            decoration: BoxDecoration(
+              color: AppTheme.cardBackground,
+              borderRadius: BorderRadius.circular(16),
+            ),
+          ),
+          const SizedBox(height: 24),
+          Container(height: 20, width: 100, color: AppTheme.cardBackground),
+          const SizedBox(height: 12),
+          ...List.generate(3, (_) => Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Container(
+              height: 80,
+              decoration: BoxDecoration(
+                color: AppTheme.cardBackground,
+                borderRadius: BorderRadius.circular(16),
+              ),
+            ),
+          )),
+        ],
+      ),
     );
   }
 
@@ -135,21 +162,35 @@ class _HomeScreenState extends State<HomeScreen> {
       padding: const EdgeInsets.all(16),
       children: [
         if (_upcomingRaces.isNotEmpty) ...[
-          Text(key: TutorialKeys.homeNextRace, 'Próxima Corrida', style: Theme.of(context).textTheme.headlineMedium),
+          Text(
+            key: TutorialKeys.homeNextRace,
+            'Próxima Corrida',
+            style: AppTheme.displayStyle(fontSize: 22),
+          ),
           const SizedBox(height: 12),
           _buildNextRaceCard(_upcomingRaces[0]),
-          const SizedBox(height: 24),
+          const SizedBox(height: 28),
         ],
-        Text(key: TutorialKeys.homeCalendar, 'Calendário', style: Theme.of(context).textTheme.titleLarge),
+        Text(
+          key: TutorialKeys.homeCalendar,
+          'Calendário',
+          style: AppTheme.displayStyle(fontSize: 18),
+        ),
         const SizedBox(height: 12),
         if (_upcomingRaces.isEmpty)
-          const Card(
-            child: Padding(
-              padding: EdgeInsets.all(24),
-              child: Text(
-                'Nenhuma corrida disponível no momento.\nO admin precisa cadastrar as corridas.',
-                textAlign: TextAlign.center,
-              ),
+          Container(
+            padding: const EdgeInsets.all(32),
+            decoration: AppTheme.cardDecoration(),
+            child: Column(
+              children: [
+                Icon(Icons.calendar_today_outlined, size: 48, color: AppTheme.textSecondary),
+                const SizedBox(height: 12),
+                const Text(
+                  'Nenhuma corrida disponível no momento.\nO admin precisa cadastrar as corridas.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: AppTheme.textSecondary),
+                ),
+              ],
             ),
           )
         else
@@ -163,125 +204,162 @@ class _HomeScreenState extends State<HomeScreen> {
     final qualiDate = _parse(race, 'qualifyingDate', 'qualifying_date');
     final raceDate  = _parse(race, 'raceDate',       'race_date');
 
-    return Card(
+    return Container(
       clipBehavior: Clip.antiAlias,
-      child: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [
-              AppTheme.primaryRed.withValues(alpha: 0.3),
-              AppTheme.cardBackground,
-            ],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        gradient: LinearGradient(
+          colors: [
+            AppTheme.primaryGreen.withValues(alpha: 0.15),
+            AppTheme.cardBackground,
+            AppTheme.cardBackground,
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          stops: const [0.0, 0.4, 1.0],
         ),
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  const Icon(Icons.flag, color: AppTheme.primaryRed),
-                  const SizedBox(width: 8),
-                  Text('Round ${race['round']}',
-                      style: const TextStyle(color: AppTheme.primaryRed)),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Text(race['name'] ?? '',
-                  style: Theme.of(context).textTheme.headlineMedium),
-              const SizedBox(height: 4),
-              // Cidade + faixa de datas (TL1 → Corrida)
-              Text(
-                '${race['location'] ?? ''}  ·  ${_dateRange(fp1Date, raceDate)}',
-                style: Theme.of(context).textTheme.bodyMedium,
-              ),
-              if (race['circuit_name'] != null || race['circuitName'] != null)
-                Text(
-                  race['circuit_name'] ?? race['circuitName'] ?? '',
-                  style: Theme.of(context).textTheme.bodyMedium,
-                ),
-              const SizedBox(height: 16),
-              // Três temporizadores: TL1 / Qualificação / Corrida
-              _buildCountdownRows(fp1Date, qualiDate, raceDate),
-              const SizedBox(height: 12),
-              if (_unappliedRaceIds.contains(race['id'] as int))
+        border: Border.all(
+          color: AppTheme.primaryGreen.withValues(alpha: 0.2),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: AppTheme.primaryGreen.withValues(alpha: 0.08),
+            blurRadius: 24,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Round badge
+            Row(
+              children: [
                 Container(
-                  margin: const EdgeInsets.only(bottom: 10),
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: Colors.orange.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.orange.withValues(alpha: 0.4)),
-                  ),
-                  child: const Row(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: AppTheme.chipDecoration(AppTheme.primaryGreen),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 16),
-                      SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          'Palpite salvo, mas ainda não aplicado em nenhuma liga',
-                          style: TextStyle(fontSize: 12, color: Colors.orange, fontWeight: FontWeight.w500),
+                      const Icon(Icons.flag, size: 14, color: AppTheme.primaryGreen),
+                      const SizedBox(width: 5),
+                      Text(
+                        'ROUND ${race['round']}',
+                        style: GoogleFonts.exo2(
+                          color: AppTheme.primaryGreen,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.5,
                         ),
                       ),
                     ],
                   ),
                 ),
-              SizedBox(
-                key: TutorialKeys.homePredictionBtn,
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: () {
-                    final raceId = race['id'] as int;
-                    final authState = context.read<AuthBloc>().state;
-                    if (authState is AuthAuthenticated &&
-                        _predictedRaceIds.contains(raceId)) {
-                      context.go('/predictions-view/$raceId');
-                    } else {
-                      context.go('/predictions/$raceId');
-                    }
-                  },
-                  icon: Icon(_predictedRaceIds.contains(race['id'] as int)
-                      ? Icons.visibility
-                      : Icons.edit),
-                  label: Text(_predictedRaceIds.contains(race['id'] as int)
-                      ? 'Ver Palpite'
-                      : 'Fazer Palpite'),
+              ],
+            ),
+            const SizedBox(height: 14),
+            Text(
+              race['name'] ?? '',
+              style: AppTheme.displayStyle(fontSize: 22),
+            ),
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                Icon(Icons.location_on_outlined, size: 14, color: AppTheme.textSecondary),
+                const SizedBox(width: 4),
+                Flexible(
+                  child: Text(
+                    '${race['location'] ?? ''}  ·  ${_dateRange(fp1Date, raceDate)}',
+                    style: const TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+                  ),
+                ),
+              ],
+            ),
+            if (race['circuit_name'] != null || race['circuitName'] != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 2, left: 18),
+                child: Text(
+                  race['circuit_name'] ?? race['circuitName'] ?? '',
+                  style: const TextStyle(color: AppTheme.textSecondary, fontSize: 12),
                 ),
               ),
-            ],
-          ),
+            const SizedBox(height: 18),
+            // Três temporizadores
+            _buildCountdownRows(fp1Date, qualiDate, raceDate),
+            const SizedBox(height: 14),
+            // Aviso de palpite não aplicado
+            if (_unappliedRaceIds.contains(race['id'] as int))
+              Container(
+                margin: const EdgeInsets.only(bottom: 12),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: AppTheme.chipDecoration(AppTheme.warningOrange),
+                child: const Row(
+                  children: [
+                    Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 16),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Palpite salvo, mas ainda não aplicado em nenhuma liga',
+                        style: TextStyle(fontSize: 12, color: Colors.orange, fontWeight: FontWeight.w500),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            // Botão de palpite
+            SizedBox(
+              key: TutorialKeys.homePredictionBtn,
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  final raceId = race['id'] as int;
+                  final authState = context.read<AuthBloc>().state;
+                  if (authState is AuthAuthenticated &&
+                      _predictedRaceIds.contains(raceId)) {
+                    context.go('/predictions-view/$raceId');
+                  } else {
+                    context.go('/predictions/$raceId');
+                  }
+                },
+                icon: Icon(_predictedRaceIds.contains(race['id'] as int)
+                    ? Icons.visibility
+                    : Icons.edit),
+                label: Text(_predictedRaceIds.contains(race['id'] as int)
+                    ? 'Ver Palpite'
+                    : 'Fazer Palpite'),
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
 
-  /// Container com três linhas de countdown (TL1 / Qualificação / Corrida)
   Widget _buildCountdownRows(DateTime? fp1, DateTime? quali, DateTime? race) {
     return Container(
       decoration: BoxDecoration(
-        color: AppTheme.primaryRed.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: AppTheme.primaryRed.withValues(alpha: 0.3)),
+        color: AppTheme.surfaceColor.withValues(alpha: 0.6),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppTheme.borderSubtle),
       ),
       child: Column(
         children: [
-          _countdownRow(Icons.timer_outlined, 'TL1', fp1),
-          const Divider(height: 1, indent: 12, endIndent: 12, color: Colors.white10),
+          _countdownRow(Icons.timer_outlined, 'TL1', fp1, isFirst: true),
+          Divider(height: 1, indent: 12, endIndent: 12, color: AppTheme.borderSubtle),
           _countdownRow(Icons.speed, 'Qualificação', quali),
-          const Divider(height: 1, indent: 12, endIndent: 12, color: Colors.white10),
-          _countdownRow(Icons.flag_outlined, 'Corrida', race),
+          Divider(height: 1, indent: 12, endIndent: 12, color: AppTheme.borderSubtle),
+          _countdownRow(Icons.flag_outlined, 'Corrida', race, isLast: true),
         ],
       ),
     );
   }
 
-  Widget _countdownRow(IconData icon, String label, DateTime? target) {
+  Widget _countdownRow(IconData icon, String label, DateTime? target, {bool isFirst = false, bool isLast = false}) {
     final t = _timeUntil(target);
     final started = t.started;
-    final color = started ? AppTheme.textSecondary : AppTheme.primaryRed;
+    final color = started ? AppTheme.textSecondary : AppTheme.primaryGreen;
 
     String timerText;
     if (started) {
@@ -293,21 +371,29 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       child: Row(
         children: [
-          Icon(icon, size: 13, color: color),
-          const SizedBox(width: 6),
+          Container(
+            width: 28,
+            height: 28,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(icon, size: 14, color: color),
+          ),
+          const SizedBox(width: 10),
           Text(label,
               style: TextStyle(
-                  fontSize: 12, color: color, fontWeight: FontWeight.w500)),
+                  fontSize: 13, color: color, fontWeight: FontWeight.w500)),
           const Spacer(),
           Text(
             timerText,
-            style: TextStyle(
-              fontSize: 12,
+            style: GoogleFonts.exo2(
+              fontSize: 13,
               color: color,
-              fontWeight: started ? FontWeight.normal : FontWeight.w600,
+              fontWeight: started ? FontWeight.w400 : FontWeight.w600,
               fontFeatures: started ? null : const [FontFeature.tabularFigures()],
             ),
           ),
@@ -324,82 +410,103 @@ class _HomeScreenState extends State<HomeScreen> {
     final hasPrediction = _predictedRaceIds.contains(raceId);
     final isUnapplied = _unappliedRaceIds.contains(raceId);
 
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        child: Row(
-          children: [
-            CircleAvatar(
-              backgroundColor: AppTheme.surfaceColor,
-              child: Text('${race['round']}',
-                  style: const TextStyle(color: AppTheme.primaryRed)),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(race['name'] ?? '',
-                      style: const TextStyle(fontWeight: FontWeight.w600)),
-                  Text(
-                    dateStr.isNotEmpty
-                        ? '${race['location'] ?? ''} - $dateStr'
-                        : '${race['location'] ?? ''}',
-                    style: const TextStyle(fontSize: 12, color: Colors.grey),
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      decoration: AppTheme.cardDecoration(),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: () {
+            final authState = context.read<AuthBloc>().state;
+            if (hasPrediction && authState is AuthAuthenticated) {
+              context.go('/predictions-view/$raceId');
+            } else {
+              context.go('/predictions/$raceId');
+            }
+          },
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            child: Row(
+              children: [
+                // Round number
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: AppTheme.primaryGreen.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: AppTheme.primaryGreen.withValues(alpha: 0.2)),
                   ),
-                  if (isUnapplied)
-                    const Padding(
-                      padding: EdgeInsets.only(top: 3),
-                      child: Row(
-                        children: [
-                          Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 13),
-                          SizedBox(width: 4),
-                          Expanded(
-                            child: Text(
-                              'Falta aplicar em uma liga',
-                              style: TextStyle(fontSize: 11, color: Colors.orange, fontWeight: FontWeight.w500),
-                            ),
-                          ),
-                        ],
+                  child: Center(
+                    child: Text(
+                      '${race['round']}',
+                      style: GoogleFonts.exo2(
+                        color: AppTheme.primaryGreen,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 15,
                       ),
                     ),
-                  const SizedBox(height: 4),
-                  _buildCompactCountdown(race),
-                ],
-              ),
-            ),
-            const SizedBox(width: 8),
-            hasPrediction
-                ? TextButton.icon(
-                    onPressed: () {
-                      final authState = context.read<AuthBloc>().state;
-                      if (authState is AuthAuthenticated) {
-                        context.go('/predictions-view/$raceId');
-                      } else {
-                        context.go('/login');
-                      }
-                    },
-                    icon: const Icon(Icons.visibility, size: 16),
-                    label: const Text('Ver Palpite',
-                        style: TextStyle(fontSize: 12)),
-                    style: TextButton.styleFrom(
-                      foregroundColor: AppTheme.primaryRed,
-                      padding:
-                          const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(race['name'] ?? '',
+                          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                      const SizedBox(height: 2),
+                      Text(
+                        dateStr.isNotEmpty
+                            ? '${race['location'] ?? ''} · $dateStr'
+                            : '${race['location'] ?? ''}',
+                        style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                      ),
+                      if (isUnapplied)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 12),
+                              const SizedBox(width: 4),
+                              const Text(
+                                'Falta aplicar em uma liga',
+                                style: TextStyle(fontSize: 11, color: Colors.orange, fontWeight: FontWeight.w500),
+                              ),
+                            ],
+                          ),
+                        ),
+                      const SizedBox(height: 4),
+                      _buildCompactCountdown(race),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                if (hasPrediction)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: AppTheme.chipDecoration(AppTheme.primaryGreen),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.check_circle_outline, size: 14, color: AppTheme.primaryGreen),
+                        const SizedBox(width: 4),
+                        Text('Palpite',
+                            style: TextStyle(fontSize: 11, color: AppTheme.primaryGreen, fontWeight: FontWeight.w600)),
+                      ],
                     ),
                   )
-                : IconButton(
-                    icon: const Icon(Icons.chevron_right),
-                    onPressed: () => context.go('/predictions/$raceId'),
-                  ),
-          ],
+                else
+                  Icon(Icons.chevron_right, color: AppTheme.textSecondary, size: 20),
+              ],
+            ),
+          ),
         ),
       ),
     );
   }
 
-  /// Compact countdown: mostra apenas o próximo evento ainda não iniciado
   Widget _buildCompactCountdown(dynamic race) {
     final sessions = [
       ('TL1',         _parse(race, 'fp1Date',        'fp1_date'),        Icons.timer_outlined),
@@ -411,23 +518,24 @@ class _HomeScreenState extends State<HomeScreen> {
       final t = _timeUntil(date);
       if (!t.started) {
         final text = t.days > 0
-            ? '${t.days}d ${_twoDigits(t.hours)}h ${_twoDigits(t.minutes)}m ${_twoDigits(t.seconds)}s'
+            ? '${t.days}d ${_twoDigits(t.hours)}h ${_twoDigits(t.minutes)}m'
             : '${_twoDigits(t.hours)}h ${_twoDigits(t.minutes)}m ${_twoDigits(t.seconds)}s';
         return Row(
           children: [
-            Icon(icon, size: 11, color: AppTheme.primaryRed),
-            const SizedBox(width: 3),
-            Text('$label: $text',
-                style: const TextStyle(
+            Icon(icon, size: 11, color: AppTheme.primaryGreen),
+            const SizedBox(width: 4),
+            Text('$label: ',
+                style: const TextStyle(fontSize: 11, color: AppTheme.textSecondary, fontWeight: FontWeight.w500)),
+            Text(text,
+                style: GoogleFonts.exo2(
                     fontSize: 11,
-                    color: AppTheme.primaryRed,
-                    fontWeight: FontWeight.w500)),
+                    color: AppTheme.primaryGreen,
+                    fontWeight: FontWeight.w600)),
           ],
         );
       }
     }
 
-    return const SizedBox.shrink(); // todos já iniciados
+    return const SizedBox.shrink();
   }
 }
-

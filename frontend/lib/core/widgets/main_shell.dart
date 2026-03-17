@@ -49,7 +49,6 @@ class _MainShellState extends State<MainShell> {
     }
   }
 
-  /// Mostra welcome dialog no primeiro acesso
   Future<void> _showWelcomeIfNeeded() async {
     final prefs = await SharedPreferences.getInstance();
     final shown = prefs.getBool(TutorialBloc.keyWelcomeShown) ?? false;
@@ -81,8 +80,18 @@ class _MainShellState extends State<MainShell> {
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: AppTheme.primaryGreen.withValues(alpha: 0.12),
+                      gradient: LinearGradient(
+                        colors: [
+                          AppTheme.primaryGreen.withValues(alpha: 0.15),
+                          AppTheme.primaryGreen.withValues(alpha: 0.05),
+                        ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
                       shape: BoxShape.circle,
+                      border: Border.all(
+                        color: AppTheme.primaryGreen.withValues(alpha: 0.2),
+                      ),
                     ),
                     child: const Icon(
                       Icons.sports_motorsports,
@@ -91,13 +100,9 @@ class _MainShellState extends State<MainShell> {
                     ),
                   ),
                   const SizedBox(height: 20),
-                  const Text(
+                  Text(
                     'Bem-vindo ao Matrix Race!',
-                    style: TextStyle(
-                      color: AppTheme.textPrimary,
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: AppTheme.displayStyle(fontSize: 22),
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 14),
@@ -159,141 +164,173 @@ class _MainShellState extends State<MainShell> {
     return Stack(
       children: [
         Scaffold(
-      appBar: AppBar(
-        title: ClipRRect(
-          borderRadius: BorderRadius.circular(10),
-          child: Image.asset(
-            'assets/images/logo_banner.png',
-            height: 76,
-            fit: BoxFit.contain,
-          ),
-        ),
-        actions: [
-          // Botão "Como Funciona"
-          IconButton(
-            key: TutorialKeys.appBarHelp,
-            icon: const Icon(Icons.help_outline),
-            tooltip: 'Como Funciona',
-            onPressed: () => context.push('/how-it-works'),
-          ),
-          // Sino de notificações com badge
-          Stack(
-            key: TutorialKeys.appBarNotifications,
-            clipBehavior: Clip.none,
-            children: [
-              IconButton(
-                icon: const Icon(Icons.notifications_outlined),
-                onPressed: () {
-                  context.push('/notifications').then((_) => _loadNotificationCount());
-                },
+          appBar: AppBar(
+            title: ClipRRect(
+              borderRadius: BorderRadius.circular(10),
+              child: Image.asset(
+                'assets/images/logo_banner.png',
+                height: 76,
+                fit: BoxFit.contain,
               ),
-              if (_unreadCount > 0)
-                Positioned(
-                  right: 6,
-                  top: 6,
-                  child: IgnorePointer(
-                    child: Container(
-                      padding: const EdgeInsets.all(3),
-                      decoration: const BoxDecoration(
-                        color: AppTheme.primaryRed,
-                        shape: BoxShape.circle,
-                      ),
-                      constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
-                      child: Text(
-                        _unreadCount > 9 ? '9+' : '$_unreadCount',
-                        style: const TextStyle(
-                            color: Colors.black,
-                            fontSize: 9,
-                            fontWeight: FontWeight.bold),
-                        textAlign: TextAlign.center,
-                      ),
-                    ),
+            ),
+            actions: [
+              // Botão "Como Funciona"
+              IconButton(
+                key: TutorialKeys.appBarHelp,
+                icon: const Icon(Icons.help_outline, size: 22),
+                tooltip: 'Como Funciona',
+                onPressed: () => context.push('/how-it-works'),
+              ),
+              // Sino de notificações com badge
+              _buildNotificationBell(),
+              // Menu do usuário
+              _buildUserMenu(),
+            ],
+            bottom: PreferredSize(
+              preferredSize: const Size.fromHeight(1),
+              child: Container(
+                height: 1,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      Colors.transparent,
+                      AppTheme.primaryGreen.withValues(alpha: 0.15),
+                      Colors.transparent,
+                    ],
                   ),
                 ),
-            ],
+              ),
+            ),
           ),
-          // Menu do usuário
-          BlocBuilder<AuthBloc, AuthState>(
-            builder: (context, authState) {
-              if (authState is AuthAuthenticated) {
-                return BlocBuilder<TutorialBloc, TutorialState>(
-                  builder: (context, tutState) {
-                    return PopupMenuButton<String>(
-                      key: TutorialKeys.appBarMenu,
-                      icon: const Icon(Icons.person),
-                      onSelected: (value) {
-                        if (value == 'logout') {
-                          context.read<AuthBloc>().add(AuthLogoutRequested());
-                        } else if (value == 'admin') {
-                          context.go('/admin');
-                        } else if (value == 'profile') {
-                          context.go('/profile');
-                        } else if (value == 'tutorial_toggle') {
-                          context.read<TutorialBloc>().add(
-                            TutorialToggleEnabled(!tutState.tutorialsEnabled),
-                          );
-                        }
-                      },
-                      itemBuilder: (context) => [
-                        PopupMenuItem(
-                          value: 'profile',
-                          child: Text(authState.user.displayName ?? 'Perfil'),
-                        ),
-                        PopupMenuItem(
-                          value: 'tutorial_toggle',
-                          child: Row(
-                            children: [
-                              Icon(
-                                Icons.lightbulb_outline,
-                                size: 18,
-                                color: tutState.tutorialsEnabled
-                                    ? AppTheme.primaryGreen
-                                    : AppTheme.textSecondary,
-                              ),
-                              const SizedBox(width: 8),
-                              Text(tutState.tutorialsEnabled
-                                  ? 'Desativar Dicas'
-                                  : 'Ativar Dicas'),
-                            ],
-                          ),
-                        ),
-                        if (_isAdmin)
-                          const PopupMenuItem(
-                            value: 'admin',
-                            child: Row(
-                              children: [
-                                Icon(Icons.admin_panel_settings,
-                                    size: 18, color: Colors.red),
-                                SizedBox(width: 8),
-                                Text('Painel Admin'),
-                              ],
-                            ),
-                          ),
-                        const PopupMenuItem(
-                          value: 'logout',
-                          child: Text('Sair'),
-                        ),
-                      ],
-                    );
-                  },
-                );
-              }
-              return TextButton(
-                onPressed: () => context.go('/login'),
-                child: const Text('Entrar'),
-              );
-            },
+          body: widget.child,
+          bottomNavigationBar: AppBottomNav(
+            key: TutorialKeys.bottomNav,
+            selectedIndex: _selectedIndex(context),
           ),
-        ],
-      ),
-      body: widget.child,
-      bottomNavigationBar: AppBottomNav(
-        key: TutorialKeys.bottomNav,
-        selectedIndex: _selectedIndex(context),
-      ),
-    ),
+        ),
         const TutorialOverlay(),
       ],
+    );
+  }
+
+  Widget _buildNotificationBell() {
+    return Padding(
+      padding: const EdgeInsets.only(right: 2),
+      child: Stack(
+        key: TutorialKeys.appBarNotifications,
+        clipBehavior: Clip.none,
+        children: [
+          IconButton(
+            icon: const Icon(Icons.notifications_outlined, size: 22),
+            onPressed: () {
+              context.push('/notifications').then((_) => _loadNotificationCount());
+            },
+          ),
+          if (_unreadCount > 0)
+            Positioned(
+              right: 8,
+              top: 8,
+              child: IgnorePointer(
+                child: Container(
+                  padding: const EdgeInsets.all(3),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primaryGreen,
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppTheme.primaryGreen.withValues(alpha: 0.4),
+                        blurRadius: 6,
+                      ),
+                    ],
+                  ),
+                  constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                  child: Text(
+                    _unreadCount > 9 ? '9+' : '$_unreadCount',
+                    style: const TextStyle(
+                        color: Colors.black,
+                        fontSize: 9,
+                        fontWeight: FontWeight.bold),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildUserMenu() {
+    return BlocBuilder<AuthBloc, AuthState>(
+      builder: (context, authState) {
+        if (authState is AuthAuthenticated) {
+          return BlocBuilder<TutorialBloc, TutorialState>(
+            builder: (context, tutState) {
+              return PopupMenuButton<String>(
+                key: TutorialKeys.appBarMenu,
+                icon: const Icon(Icons.person, size: 22),
+                onSelected: (value) {
+                  if (value == 'logout') {
+                    context.read<AuthBloc>().add(AuthLogoutRequested());
+                  } else if (value == 'admin') {
+                    context.go('/admin');
+                  } else if (value == 'profile') {
+                    context.go('/profile');
+                  } else if (value == 'tutorial_toggle') {
+                    context.read<TutorialBloc>().add(
+                      TutorialToggleEnabled(!tutState.tutorialsEnabled),
+                    );
+                  }
+                },
+                itemBuilder: (context) => [
+                  PopupMenuItem(
+                    value: 'profile',
+                    child: Text(authState.user.displayName ?? 'Perfil'),
+                  ),
+                  PopupMenuItem(
+                    value: 'tutorial_toggle',
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.lightbulb_outline,
+                          size: 18,
+                          color: tutState.tutorialsEnabled
+                              ? AppTheme.primaryGreen
+                              : AppTheme.textSecondary,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(tutState.tutorialsEnabled
+                            ? 'Desativar Dicas'
+                            : 'Ativar Dicas'),
+                      ],
+                    ),
+                  ),
+                  if (_isAdmin)
+                    const PopupMenuItem(
+                      value: 'admin',
+                      child: Row(
+                        children: [
+                          Icon(Icons.admin_panel_settings,
+                              size: 18, color: Colors.red),
+                          SizedBox(width: 8),
+                          Text('Painel Admin'),
+                        ],
+                      ),
+                    ),
+                  const PopupMenuItem(
+                    value: 'logout',
+                    child: Text('Sair'),
+                  ),
+                ],
+              );
+            },
+          );
+        }
+        return TextButton(
+          onPressed: () => context.go('/login'),
+          child: const Text('Entrar'),
+        );
+      },
     );
   }
 }

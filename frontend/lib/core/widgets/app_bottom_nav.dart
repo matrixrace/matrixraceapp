@@ -16,55 +16,73 @@ class AppBottomNav extends StatelessWidget {
     return BlocBuilder<AuthBloc, AuthState>(
       builder: (context, state) {
         if (state is! AuthAuthenticated) return const SizedBox.shrink();
-        return NavigationBar(
-          backgroundColor: AppTheme.cardBackground,
-          selectedIndex: selectedIndex,
-          onDestinationSelected: (index) {
-            switch (index) {
-              case 0:
-                context.go('/');
-              case 1:
-                context.go('/live');
-              case 2:
-                context.go('/leagues');
-              case 3:
-                context.go('/rankings');
-              case 4:
-                context.go('/f1-results');
-              case 5:
-                context.go('/profile');
-            }
-          },
-          destinations: const [
-            NavigationDestination(
-              icon: Icon(Icons.home_outlined),
-              selectedIcon: Icon(Icons.home),
-              label: 'Início',
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Linha de brilho sutil no topo
+            Container(
+              height: 1,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    Colors.transparent,
+                    AppTheme.primaryGreen.withValues(alpha: 0.12),
+                    Colors.transparent,
+                  ],
+                ),
+              ),
             ),
-            NavigationDestination(
-              icon: Icon(Icons.live_tv_outlined),
-              selectedIcon: Icon(Icons.live_tv),
-              label: 'Live',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.groups_outlined),
-              selectedIcon: Icon(Icons.groups),
-              label: 'Ligas',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.leaderboard_outlined),
-              selectedIcon: Icon(Icons.leaderboard),
-              label: 'Ranking',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.emoji_events_outlined),
-              selectedIcon: Icon(Icons.emoji_events),
-              label: 'Histórico',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.person_outline),
-              selectedIcon: Icon(Icons.person),
-              label: 'Perfil',
+            NavigationBar(
+              backgroundColor: AppTheme.cardBackground,
+              selectedIndex: selectedIndex,
+              onDestinationSelected: (index) {
+                switch (index) {
+                  case 0:
+                    context.go('/');
+                  case 1:
+                    context.go('/live');
+                  case 2:
+                    context.go('/leagues');
+                  case 3:
+                    context.go('/rankings');
+                  case 4:
+                    context.go('/f1-results');
+                  case 5:
+                    context.go('/profile');
+                }
+              },
+              destinations: const [
+                NavigationDestination(
+                  icon: Icon(Icons.home_outlined),
+                  selectedIcon: Icon(Icons.home),
+                  label: 'Início',
+                ),
+                NavigationDestination(
+                  icon: Icon(Icons.live_tv_outlined),
+                  selectedIcon: Icon(Icons.live_tv),
+                  label: 'Live',
+                ),
+                NavigationDestination(
+                  icon: Icon(Icons.groups_outlined),
+                  selectedIcon: Icon(Icons.groups),
+                  label: 'Ligas',
+                ),
+                NavigationDestination(
+                  icon: Icon(Icons.leaderboard_outlined),
+                  selectedIcon: Icon(Icons.leaderboard),
+                  label: 'Ranking',
+                ),
+                NavigationDestination(
+                  icon: Icon(Icons.emoji_events_outlined),
+                  selectedIcon: Icon(Icons.emoji_events),
+                  label: 'Histórico',
+                ),
+                NavigationDestination(
+                  icon: Icon(Icons.person_outline),
+                  selectedIcon: Icon(Icons.person),
+                  label: 'Perfil',
+                ),
+              ],
             ),
           ],
         );

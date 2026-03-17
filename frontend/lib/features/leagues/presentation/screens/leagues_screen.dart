@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:shimmer/shimmer.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/tutorial/tutorial_bloc.dart';
@@ -21,8 +23,8 @@ class _LeaguesScreenState extends State<LeaguesScreen> {
   final ApiClient _api = ApiClient();
 
   // ── Filtros ──────────────────────────────────────────────────────────────
-  String _membershipFilter = 'all'; // 'mine' | 'others' | 'all'
-  String _statusFilter = 'active';  // 'active' | 'ended' | 'all'
+  String _membershipFilter = 'all';
+  String _statusFilter = 'active';
   String? _selectedRaceId;
   String? _selectedRaceName;
 
@@ -41,7 +43,6 @@ class _LeaguesScreenState extends State<LeaguesScreen> {
     _loadLeagues();
   }
 
-  // Carrega a lista de GPs para o filtro
   Future<void> _loadRaces() async {
     final res = await _api.get('/races/all');
     if (mounted && res.success && res.data != null) {
@@ -58,7 +59,6 @@ class _LeaguesScreenState extends State<LeaguesScreen> {
     List<dynamic> result = [];
 
     if (_membershipFilter == 'mine') {
-      // Apenas minhas ligas (backend filtra por status)
       final params = <String>[];
       if (_selectedRaceId != null) params.add('raceId=$_selectedRaceId');
       params.add('status=$_statusFilter');
@@ -72,11 +72,9 @@ class _LeaguesScreenState extends State<LeaguesScreen> {
         }).toList();
       }
     } else if (_membershipFilter == 'others') {
-      // Ligas públicas excluindo as minhas
       final res = await _api.get('/leagues/public?$statusParam$raceParam');
       if (res.success && res.data != null) {
         final pubList = res.data as List;
-        // Busca minhas ligas para excluir
         final myRes = await _api.get('/leagues');
         final myIds = <dynamic>{};
         if (myRes.success && myRes.data != null) {
@@ -87,7 +85,6 @@ class _LeaguesScreenState extends State<LeaguesScreen> {
         result = pubList.where((l) => !myIds.contains(l['id'])).toList();
       }
     } else {
-      // Todas: minhas + públicas combinadas (backend filtra status em ambos)
       final myParams = <String>[];
       if (_selectedRaceId != null) myParams.add('raceId=$_selectedRaceId');
       myParams.add('status=$_statusFilter');
@@ -136,7 +133,6 @@ class _LeaguesScreenState extends State<LeaguesScreen> {
     });
   }
 
-  // ── Helpers de label ─────────────────────────────────────────────────────
   String get _membershipLabel => switch (_membershipFilter) {
         'mine' => 'Minhas Ligas',
         'others' => 'Outras Ligas',
@@ -167,23 +163,27 @@ class _LeaguesScreenState extends State<LeaguesScreen> {
       floatingActionButton: FloatingActionButton.extended(
         key: TutorialKeys.leaguesCreateBtn,
         onPressed: () => context.go('/leagues/create'),
-        backgroundColor: AppTheme.primaryRed,
+        backgroundColor: AppTheme.primaryGreen,
         icon: const Icon(Icons.add),
-        label: const Text('Criar Liga'),
+        label: Text('Criar Liga', style: GoogleFonts.exo2(fontWeight: FontWeight.w700)),
       ),
       body: Column(
         children: [
           // ── Barra de filtros ──────────────────────────────────────────
           Container(
-            color: AppTheme.cardBackground,
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+            decoration: BoxDecoration(
+              color: AppTheme.cardBackground,
+              border: Border(
+                bottom: BorderSide(color: AppTheme.borderSubtle),
+              ),
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
             child: SingleChildScrollView(
               key: TutorialKeys.leaguesFilter,
               scrollDirection: Axis.horizontal,
               child: Row(
                 children: [
-                  // Filtro 1: Ligas
-                  _FilterMenu(
+                  _FilterChip(
                     label: _membershipLabel,
                     icon: Icons.groups_outlined,
                     active: _membershipFilter != 'all',
@@ -198,9 +198,7 @@ class _LeaguesScreenState extends State<LeaguesScreen> {
                     },
                   ),
                   const SizedBox(width: 6),
-
-                  // Filtro 2: Atividade
-                  _FilterMenu(
+                  _FilterChip(
                     label: _statusLabel,
                     icon: Icons.access_time_outlined,
                     active: _statusFilter != 'active',
@@ -215,9 +213,7 @@ class _LeaguesScreenState extends State<LeaguesScreen> {
                     },
                   ),
                   const SizedBox(width: 6),
-
-                  // Filtro 3: GP
-                  _FilterMenu(
+                  _FilterChip(
                     label: _raceLabel,
                     icon: Icons.flag_outlined,
                     active: _selectedRaceId != null,
@@ -252,9 +248,9 @@ class _LeaguesScreenState extends State<LeaguesScreen> {
             ),
           ),
 
-          // ── Barra de busca por nome ──────────────────────────────────
+          // ── Barra de busca por nome ────────────────────────────────────
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             child: TextField(
               onChanged: (value) => setState(() => _searchQuery = value),
               style: const TextStyle(fontSize: 14, color: AppTheme.textPrimary),
@@ -264,10 +260,14 @@ class _LeaguesScreenState extends State<LeaguesScreen> {
                 prefixIcon: const Icon(Icons.search, size: 20, color: AppTheme.textSecondary),
                 filled: true,
                 fillColor: AppTheme.surfaceColor,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(12),
                   borderSide: BorderSide.none,
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: AppTheme.borderSubtle),
                 ),
                 isDense: true,
               ),
@@ -277,23 +277,23 @@ class _LeaguesScreenState extends State<LeaguesScreen> {
           // ── Lista de ligas ────────────────────────────────────────────
           Expanded(
             child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
+                ? _buildShimmer()
                 : _filteredLeagues.isEmpty
                     ? Center(
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             const Icon(Icons.groups_outlined,
-                                size: 64, color: AppTheme.textSecondary),
+                                size: 56, color: AppTheme.textSecondary),
                             const SizedBox(height: 16),
                             Text(
                               'Nenhuma liga encontrada',
                               style: Theme.of(context).textTheme.bodyMedium,
                             ),
                             const SizedBox(height: 4),
-                            Text(
+                            const Text(
                               'Tente outros filtros',
-                              style: const TextStyle(
+                              style: TextStyle(
                                   color: AppTheme.textSecondary, fontSize: 13),
                             ),
                           ],
@@ -302,7 +302,7 @@ class _LeaguesScreenState extends State<LeaguesScreen> {
                     : RefreshIndicator(
                         onRefresh: _loadLeagues,
                         child: ListView.builder(
-                          padding: const EdgeInsets.fromLTRB(16, 12, 16, 80),
+                          padding: const EdgeInsets.fromLTRB(16, 8, 16, 80),
                           itemCount: _filteredLeagues.length,
                           itemBuilder: (context, index) =>
                               _buildLeagueCard(_filteredLeagues[index]),
@@ -314,9 +314,25 @@ class _LeaguesScreenState extends State<LeaguesScreen> {
     );
   }
 
-  /// Retorna a contagem total de GPs de uma liga.
-  /// Suporta tanto o campo `race_count` (getMyLeagues) quanto
-  /// a soma de `future_race_count` + `past_race_count` (getPublicLeagues).
+  Widget _buildShimmer() {
+    return Shimmer.fromColors(
+      baseColor: AppTheme.cardBackground,
+      highlightColor: AppTheme.surfaceColor,
+      child: ListView.builder(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 80),
+        itemCount: 5,
+        itemBuilder: (_, _) => Container(
+          margin: const EdgeInsets.only(bottom: 12),
+          height: 100,
+          decoration: BoxDecoration(
+            color: AppTheme.cardBackground,
+            borderRadius: BorderRadius.circular(16),
+          ),
+        ),
+      ),
+    );
+  }
+
   int _getRaceCount(dynamic league) {
     if (league['race_count'] != null) {
       return int.tryParse(league['race_count'].toString()) ?? 0;
@@ -333,137 +349,126 @@ class _LeaguesScreenState extends State<LeaguesScreen> {
     final requiresApproval = league['requires_approval'] == true;
     final raceCount = _getRaceCount(league);
 
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: InkWell(
-        onTap: () => context.push('/leagues/${league['id']}', extra: isMember),
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Nome + badge
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      league['name'] ?? '',
-                      style: Theme.of(context).textTheme.titleMedium,
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      decoration: AppTheme.cardDecoration(),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => context.push('/leagues/${league['id']}', extra: isMember),
+          borderRadius: BorderRadius.circular(16),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Nome + badge
+                Row(
+                  children: [
+                    // Ícone da liga
+                    Container(
+                      width: 38,
+                      height: 38,
+                      decoration: BoxDecoration(
+                        color: isMember
+                            ? AppTheme.primaryGreen.withValues(alpha: 0.1)
+                            : AppTheme.surfaceColor,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: isMember
+                              ? AppTheme.primaryGreen.withValues(alpha: 0.2)
+                              : AppTheme.borderSubtle,
+                        ),
+                      ),
+                      child: Center(
+                        child: Text(
+                          (league['name'] ?? '?')[0].toUpperCase(),
+                          style: GoogleFonts.exo2(
+                            color: isMember ? AppTheme.primaryGreen : AppTheme.textSecondary,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 16,
+                          ),
+                        ),
+                      ),
                     ),
-                  ),
-                  if (isMember)
-                    _buildChip('Membro', AppTheme.successGreen)
-                  else if (isPending)
-                    _buildChip('Pendente', AppTheme.warningOrange),
-                ],
-              ),
-              if (league['description'] != null) ...[
-                const SizedBox(height: 4),
-                Text(
-                  league['description'],
-                  style: Theme.of(context).textTheme.bodyMedium,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            league['name'] ?? '',
+                            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+                          ),
+                          if (league['description'] != null)
+                            Text(
+                              league['description'],
+                              style: const TextStyle(color: AppTheme.textSecondary, fontSize: 12),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                        ],
+                      ),
+                    ),
+                    if (isMember)
+                      _buildStatusBadge('Membro', AppTheme.successGreen)
+                    else if (isPending)
+                      _buildStatusBadge('Pendente', AppTheme.warningOrange),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                // Meta info
+                Wrap(
+                  spacing: 14,
+                  runSpacing: 4,
+                  children: [
+                    if (league['owner_name'] != null)
+                      _buildMeta(Icons.person_outline, league['owner_name']),
+                    _buildMeta(Icons.people_outline, '${league['member_count'] ?? 0} membros'),
+                    _buildMeta(Icons.flag_outlined, '$raceCount GPs'),
+                    if (league['my_points'] != null)
+                      _buildMeta(Icons.star, '${league['my_points']} pts',
+                          color: AppTheme.accentGold),
+                    if (requiresApproval)
+                      _buildMeta(Icons.lock_outline, 'Requer aprovação',
+                          color: AppTheme.warningOrange),
+                  ],
                 ),
               ],
-              const SizedBox(height: 8),
-              // Meta info
-              Wrap(
-                spacing: 12,
-                children: [
-                  if (league['owner_name'] != null)
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(Icons.person_outline,
-                            size: 13, color: AppTheme.textSecondary),
-                        const SizedBox(width: 3),
-                        Text(
-                          league['owner_name'],
-                          style: const TextStyle(
-                              fontSize: 12, color: AppTheme.textSecondary),
-                        ),
-                      ],
-                    ),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.people_outline,
-                          size: 13, color: AppTheme.textSecondary),
-                      const SizedBox(width: 3),
-                      Text(
-                        '${league['member_count'] ?? 0} membros',
-                        style: const TextStyle(
-                            fontSize: 12, color: AppTheme.textSecondary),
-                      ),
-                    ],
-                  ),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.flag_outlined,
-                          size: 13, color: AppTheme.textSecondary),
-                      const SizedBox(width: 3),
-                      Text(
-                        '$raceCount GPs',
-                        style: const TextStyle(
-                            fontSize: 12, color: AppTheme.textSecondary),
-                      ),
-                    ],
-                  ),
-                  if (league['my_points'] != null)
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(Icons.star,
-                            size: 13, color: AppTheme.accentGold),
-                        const SizedBox(width: 3),
-                        Text(
-                          '${league['my_points']} pts',
-                          style: const TextStyle(
-                              fontSize: 12,
-                              color: AppTheme.accentGold,
-                              fontWeight: FontWeight.w600),
-                        ),
-                      ],
-                    ),
-                  if (requiresApproval)
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: const [
-                        Icon(Icons.lock_outline,
-                            size: 13, color: AppTheme.warningOrange),
-                        SizedBox(width: 3),
-                        Text(
-                          'Requer aprovação',
-                          style: TextStyle(
-                              fontSize: 12, color: AppTheme.warningOrange),
-                        ),
-                      ],
-                    ),
-                ],
-              ),
-            ],
+            ),
           ),
         ),
       ),
     );
   }
 
-  Widget _buildChip(String label, Color color) {
+  Widget _buildStatusBadge(String label, Color color) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color, width: 1),
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: AppTheme.chipDecoration(color),
       child: Text(
         label,
-        style:
-            TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.w600),
+        style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.w600),
       ),
+    );
+  }
+
+  Widget _buildMeta(IconData icon, String text, {Color? color}) {
+    final c = color ?? AppTheme.textSecondary;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 13, color: c),
+        const SizedBox(width: 4),
+        Text(
+          text,
+          style: TextStyle(
+            fontSize: 12,
+            color: c,
+            fontWeight: color != null ? FontWeight.w600 : FontWeight.w400,
+          ),
+        ),
+      ],
     );
   }
 }
@@ -476,16 +481,16 @@ class _FilterItem {
   const _FilterItem(this.value, this.label);
 }
 
-// ── Widget de botão de filtro com menu suspenso ───────────────────────────────
+// ── Widget de chip de filtro com menu suspenso ────────────────────────────────
 
-class _FilterMenu extends StatelessWidget {
+class _FilterChip extends StatelessWidget {
   final String label;
   final IconData icon;
   final bool active;
   final List<_FilterItem> items;
   final void Function(String value) onSelected;
 
-  const _FilterMenu({
+  const _FilterChip({
     required this.label,
     required this.icon,
     required this.active,
@@ -495,9 +500,9 @@ class _FilterMenu extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = active ? AppTheme.primaryRed : AppTheme.textSecondary;
+    final color = active ? AppTheme.primaryGreen : AppTheme.textSecondary;
     final bgColor = active
-        ? AppTheme.primaryRed.withValues(alpha: 0.12)
+        ? AppTheme.primaryGreen.withValues(alpha: 0.1)
         : AppTheme.surfaceColor;
 
     return GestureDetector(
@@ -519,13 +524,17 @@ class _FilterMenu extends StatelessWidget {
           context: context,
           position: position,
           color: AppTheme.cardBackground,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+            side: const BorderSide(color: AppTheme.borderSubtle),
+          ),
           items: items
               .map((item) => PopupMenuItem<String>(
                     value: item.value,
                     child: Text(item.label,
                         style: TextStyle(
                           color: item.label == label
-                              ? AppTheme.primaryRed
+                              ? AppTheme.primaryGreen
                               : AppTheme.textPrimary,
                           fontWeight: item.label == label
                               ? FontWeight.w600
@@ -537,28 +546,28 @@ class _FilterMenu extends StatelessWidget {
         if (selected != null) onSelected(selected);
       },
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
           color: bgColor,
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(10),
           border: Border.all(
             color: active
-                ? AppTheme.primaryRed.withValues(alpha: 0.5)
-                : AppTheme.textSecondary.withValues(alpha: 0.25),
+                ? AppTheme.primaryGreen.withValues(alpha: 0.4)
+                : AppTheme.borderSubtle,
           ),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(icon, size: 14, color: color),
-            const SizedBox(width: 5),
+            const SizedBox(width: 6),
             Text(
               label,
               style: TextStyle(
                   fontSize: 12, color: color, fontWeight: FontWeight.w500),
             ),
-            const SizedBox(width: 3),
+            const SizedBox(width: 4),
             Icon(Icons.arrow_drop_down, size: 16, color: color),
           ],
         ),

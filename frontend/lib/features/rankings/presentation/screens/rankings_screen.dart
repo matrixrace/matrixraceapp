@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import '../../../../core/network/api_client.dart';
@@ -20,12 +22,10 @@ class RankingsScreen extends StatefulWidget {
 class _RankingsScreenState extends State<RankingsScreen> {
   final ApiClient _api = ApiClient();
 
-  // Filtro ativo
-  String _activeFilter = 'month'; // 'month' | '30d' | '60d' | '90d' | 'custom'
+  String _activeFilter = 'month';
   DateTime _selectedMonth = DateTime.now();
   DateTimeRange? _customRange;
 
-  // Dados
   List<dynamic> _ranking = [];
   bool _isLoading = true;
 
@@ -138,11 +138,15 @@ class _RankingsScreenState extends State<RankingsScreen> {
       children: [
         // ── Barra de filtros ──────────────────────────────────────────────
         Container(
-          color: AppTheme.cardBackground,
+          decoration: BoxDecoration(
+            color: AppTheme.cardBackground,
+            border: Border(
+              bottom: BorderSide(color: AppTheme.borderSubtle),
+            ),
+          ),
           padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
           child: Column(
             children: [
-              // Chips de filtro
               SingleChildScrollView(
                 key: TutorialKeys.rankingsFilters,
                 scrollDirection: Axis.horizontal,
@@ -161,9 +165,8 @@ class _RankingsScreenState extends State<RankingsScreen> {
                 ),
               ),
 
-              // Navegador de mês
               if (_activeFilter == 'month') ...[
-                const SizedBox(height: 8),
+                const SizedBox(height: 10),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
@@ -175,9 +178,9 @@ class _RankingsScreenState extends State<RankingsScreen> {
                     ),
                     Text(
                       _monthLabel(),
-                      style: const TextStyle(
+                      style: GoogleFonts.exo2(
                         fontSize: 15,
-                        fontWeight: FontWeight.w600,
+                        fontWeight: FontWeight.w700,
                         color: AppTheme.textPrimary,
                       ),
                     ),
@@ -191,17 +194,16 @@ class _RankingsScreenState extends State<RankingsScreen> {
                 ),
               ],
 
-              // Exibição do range customizado
               if (_activeFilter == 'custom') ...[
-                const SizedBox(height: 8),
+                const SizedBox(height: 10),
                 GestureDetector(
                   onTap: _pickDateRange,
                   child: Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     decoration: BoxDecoration(
                       color: AppTheme.surfaceColor,
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: AppTheme.borderSubtle),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
@@ -227,8 +229,6 @@ class _RankingsScreenState extends State<RankingsScreen> {
           ),
         ),
 
-        const Divider(height: 1, color: Color(0x14FFFFFF)),
-
         // ── Lista do ranking ──────────────────────────────────────────────
         Expanded(
           child: _isLoading
@@ -238,12 +238,18 @@ class _RankingsScreenState extends State<RankingsScreen> {
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          const Icon(Icons.leaderboard_outlined,
-                              size: 64, color: AppTheme.textSecondary),
-                          const SizedBox(height: 12),
+                          Container(
+                            padding: const EdgeInsets.all(20),
+                            decoration: BoxDecoration(
+                              color: AppTheme.surfaceColor,
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(Icons.leaderboard_outlined,
+                                size: 48, color: AppTheme.textSecondary),
+                          ),
+                          const SizedBox(height: 16),
                           const Text('Nenhuma pontuação neste período.',
-                              style:
-                                  TextStyle(color: AppTheme.textSecondary)),
+                              style: TextStyle(color: AppTheme.textSecondary)),
                           const SizedBox(height: 8),
                           TextButton(
                             onPressed: () {
@@ -260,11 +266,9 @@ class _RankingsScreenState extends State<RankingsScreen> {
                     )
                   : RefreshIndicator(
                       onRefresh: _load,
-                      child: ListView.separated(
-                        padding: const EdgeInsets.symmetric(vertical: 8),
+                      child: ListView.builder(
+                        padding: const EdgeInsets.symmetric(vertical: 4),
                         itemCount: _ranking.length,
-                        separatorBuilder: (_, _) =>
-                            const Divider(height: 1, indent: 16),
                         itemBuilder: (context, i) {
                           final entry = _ranking[i] as Map<String, dynamic>;
                           final position = entry['position'] ?? (i + 1);
@@ -283,84 +287,16 @@ class _RankingsScreenState extends State<RankingsScreen> {
                                       entry['races_played']?.toString() ??
                                       '0') ??
                               0;
+                          final userId = entry['userId'] ?? entry['user_id'];
 
-                          return Padding(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 16, vertical: 12),
-                            child: Row(
-                              children: [
-                                SizedBox(
-                                  width: 32,
-                                  child: _positionWidget(position),
-                                ),
-                                const SizedBox(width: 12),
-                                CircleAvatar(
-                                  radius: 18,
-                                  backgroundColor: AppTheme.surfaceColor,
-                                  backgroundImage: avatar != null
-                                      ? NetworkImage(avatar.toString())
-                                      : null,
-                                  child: avatar == null
-                                      ? Text(
-                                          name.toString().isNotEmpty
-                                              ? name
-                                                  .toString()[0]
-                                                  .toUpperCase()
-                                              : '?',
-                                          style: const TextStyle(
-                                              color: AppTheme.primaryRed,
-                                              fontWeight: FontWeight.bold,
-                                              fontSize: 12),
-                                        )
-                                      : null,
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Row(
-                                        children: [
-                                          Flexible(
-                                            child: Text(name.toString(),
-                                                style: const TextStyle(
-                                                    fontWeight: FontWeight.w600,
-                                                    fontSize: 14),
-                                                overflow: TextOverflow.ellipsis),
-                                          ),
-                                          PodiumBadges.fromMap(
-                                            entry['podiumStats'] as Map<String, dynamic>?,
-                                            fontSize: 11,
-                                          ),
-                                        ],
-                                      ),
-                                      Text(
-                                        '$races ${races == 1 ? 'corrida' : 'corridas'}',
-                                        style: const TextStyle(
-                                            fontSize: 11,
-                                            color: AppTheme.textSecondary),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                Text(
-                                  '$points',
-                                  style: TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                    color: position <= 3
-                                        ? _medalColor(position)
-                                        : AppTheme.textPrimary,
-                                  ),
-                                ),
-                                const SizedBox(width: 4),
-                                const Text('pts',
-                                    style: TextStyle(
-                                        fontSize: 11,
-                                        color: AppTheme.textSecondary)),
-                              ],
-                            ),
+                          return _buildRankingRow(
+                            position: position,
+                            name: name.toString(),
+                            avatar: avatar?.toString(),
+                            points: points,
+                            races: races,
+                            userId: userId,
+                            podiumStats: entry['podiumStats'] as Map<String, dynamic>?,
                           );
                         },
                       ),
@@ -370,21 +306,132 @@ class _RankingsScreenState extends State<RankingsScreen> {
     );
   }
 
+  Widget _buildRankingRow({
+    required int position,
+    required String name,
+    required String? avatar,
+    required int points,
+    required int races,
+    required dynamic userId,
+    Map<String, dynamic>? podiumStats,
+  }) {
+    final isTop3 = position <= 3;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: userId != null ? () => context.push('/users/$userId') : null,
+        child: Container(
+          decoration: isTop3
+              ? BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      _medalColor(position).withValues(alpha: 0.06),
+                      Colors.transparent,
+                    ],
+                  ),
+                )
+              : null,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          child: Row(
+            children: [
+              // Posição
+              SizedBox(
+                width: 36,
+                child: _positionWidget(position),
+              ),
+              const SizedBox(width: 12),
+              // Avatar
+              CircleAvatar(
+                radius: isTop3 ? 20 : 18,
+                backgroundColor: AppTheme.surfaceColor,
+                backgroundImage: avatar != null
+                    ? NetworkImage(avatar)
+                    : null,
+                child: avatar == null
+                    ? Text(
+                        name.isNotEmpty ? name[0].toUpperCase() : '?',
+                        style: TextStyle(
+                            color: AppTheme.primaryGreen,
+                            fontWeight: FontWeight.bold,
+                            fontSize: isTop3 ? 14 : 12),
+                      )
+                    : null,
+              ),
+              const SizedBox(width: 12),
+              // Nome + corridas
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(name,
+                              style: TextStyle(
+                                  fontWeight: isTop3 ? FontWeight.w700 : FontWeight.w500,
+                                  fontSize: 14),
+                              overflow: TextOverflow.ellipsis),
+                        ),
+                        PodiumBadges.fromMap(podiumStats, fontSize: 11),
+                      ],
+                    ),
+                    Text(
+                      '$races ${races == 1 ? 'corrida' : 'corridas'}',
+                      style: const TextStyle(
+                          fontSize: 11,
+                          color: AppTheme.textSecondary),
+                    ),
+                  ],
+                ),
+              ),
+              // Pontos
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.baseline,
+                textBaseline: TextBaseline.alphabetic,
+                children: [
+                  Text(
+                    '$points',
+                    style: GoogleFonts.exo2(
+                      fontSize: isTop3 ? 20 : 17,
+                      fontWeight: FontWeight.w800,
+                      color: isTop3
+                          ? _medalColor(position)
+                          : AppTheme.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(width: 3),
+                  const Text('pts',
+                      style: TextStyle(
+                          fontSize: 11,
+                          color: AppTheme.textSecondary)),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildFilterChip(String label, String filterKey) {
     final isActive = _activeFilter == filterKey;
     return GestureDetector(
       onTap: () => _setFilter(filterKey),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
         decoration: BoxDecoration(
           color: isActive
-              ? AppTheme.primaryGreen.withValues(alpha: 0.15)
+              ? AppTheme.primaryGreen.withValues(alpha: 0.12)
               : AppTheme.surfaceColor,
-          borderRadius: BorderRadius.circular(20),
-          border: isActive
-              ? Border.all(
-                  color: AppTheme.primaryGreen.withValues(alpha: 0.5))
-              : null,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: isActive
+                ? AppTheme.primaryGreen.withValues(alpha: 0.4)
+                : AppTheme.borderSubtle,
+          ),
         ),
         child: Text(
           label,
@@ -399,20 +446,20 @@ class _RankingsScreenState extends State<RankingsScreen> {
   }
 
   Widget _positionWidget(int position) {
-    if (position == 1) {
-      return const Text('🥇', style: TextStyle(fontSize: 22));
-    }
-    if (position == 2) {
-      return const Text('🥈', style: TextStyle(fontSize: 22));
-    }
-    if (position == 3) {
-      return const Text('🥉', style: TextStyle(fontSize: 22));
+    if (position <= 3) {
+      final icons = {1: '🥇', 2: '🥈', 3: '🥉'};
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(icons[position]!, style: const TextStyle(fontSize: 22)),
+        ],
+      );
     }
     return Text(
       '$position',
-      style: const TextStyle(
+      style: GoogleFonts.exo2(
           fontSize: 16,
-          fontWeight: FontWeight.bold,
+          fontWeight: FontWeight.w700,
           color: AppTheme.textSecondary),
       textAlign: TextAlign.center,
     );

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/services/socket_service.dart';
@@ -22,13 +23,11 @@ class _LiveScreenState extends State<LiveScreen> with SingleTickerProviderStateM
   bool _loading = true;
   String? _error;
 
-  // Dados da corrida
   Map<String, dynamic>? _raceInfo;
   List<String> _availableSessions = [];
   Map<String, dynamic> _sessions = {};
   TabController? _tabController;
 
-  // Scoring
   Map<String, dynamic>? _scoring;
   int _currentRaceId = 0;
 
@@ -51,7 +50,6 @@ class _LiveScreenState extends State<LiveScreen> with SingleTickerProviderStateM
   Future<void> _loadNextRace() async {
     setState(() { _loading = true; _error = null; });
 
-    // Busca proxima corrida
     final racesRes = await _api.get('/races/all');
     if (!mounted) return;
 
@@ -66,7 +64,6 @@ class _LiveScreenState extends State<LiveScreen> with SingleTickerProviderStateM
       return;
     }
 
-    // Encontra a corrida mais proxima (nao completada)
     Map<String, dynamic>? nextRace;
     final now = DateTime.now().toUtc();
     for (final r in races) {
@@ -77,16 +74,13 @@ class _LiveScreenState extends State<LiveScreen> with SingleTickerProviderStateM
       }
     }
 
-    // Se nenhuma proxima, pega a ultima
     nextRace ??= Map<String, dynamic>.from(races.last);
     final raceId = nextRace['id'] as int;
 
-    // Entra na sala socket
     if (_currentRaceId > 0) _socket.leaveRace(_currentRaceId);
     _currentRaceId = raceId;
     _socket.joinRace(raceId);
 
-    // Escuta atualizacoes via socket
     _socketSub?.cancel();
     _socketSub = _socket.sessionResultsStream.listen((data) {
       if (data['raceId'] == _currentRaceId) {
@@ -118,7 +112,6 @@ class _LiveScreenState extends State<LiveScreen> with SingleTickerProviderStateM
         if (_tabController == null || _tabController!.length != available.length) {
           _tabController?.dispose();
           _tabController = TabController(length: available.length, vsync: this);
-          // Seleciona a aba com dados mais recentes
           _selectLatestTab();
         }
       });
@@ -142,7 +135,6 @@ class _LiveScreenState extends State<LiveScreen> with SingleTickerProviderStateM
 
   void _selectLatestTab() {
     if (_tabController == null || _availableSessions.isEmpty) return;
-    // Encontra a ultima sessao que tem dados
     int latestIdx = 0;
     for (int i = _availableSessions.length - 1; i >= 0; i--) {
       final sess = _sessions[_availableSessions[i]];
@@ -170,7 +162,7 @@ class _LiveScreenState extends State<LiveScreen> with SingleTickerProviderStateM
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return const Center(child: CircularProgressIndicator(color: AppTheme.primaryRed));
+      return const Center(child: CircularProgressIndicator());
     }
 
     if (_error != null) {
@@ -178,7 +170,14 @@ class _LiveScreenState extends State<LiveScreen> with SingleTickerProviderStateM
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.live_tv, size: 64, color: Colors.grey),
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: AppTheme.surfaceColor,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.live_tv, size: 48, color: AppTheme.textSecondary),
+            ),
             const SizedBox(height: 16),
             Text(_error!, style: const TextStyle(color: AppTheme.textSecondary)),
             const SizedBox(height: 16),
@@ -194,9 +193,8 @@ class _LiveScreenState extends State<LiveScreen> with SingleTickerProviderStateM
 
     return Column(
       children: [
-        // Header com info da corrida e pontuacao provisoria
         _buildHeader(),
-        // Botao Resultados Anteriores
+        // Botão Resultados Anteriores
         Container(
           width: double.infinity,
           color: AppTheme.cardBackground,
@@ -207,25 +205,27 @@ class _LiveScreenState extends State<LiveScreen> with SingleTickerProviderStateM
             label: const Text('Resultados Anteriores', style: TextStyle(fontSize: 13)),
             style: OutlinedButton.styleFrom(
               padding: const EdgeInsets.symmetric(vertical: 10),
-              side: BorderSide(color: AppTheme.textSecondary.withValues(alpha: 0.3)),
+              side: BorderSide(color: AppTheme.textSecondary.withValues(alpha: 0.2)),
             ),
           ),
         ),
-        // Tabs de sessoes
+        // Tabs de sessões
         if (_tabController != null)
           Container(
             key: TutorialKeys.liveSessionTabs,
-            color: AppTheme.cardBackground,
+            decoration: BoxDecoration(
+              color: AppTheme.cardBackground,
+              border: Border(
+                bottom: BorderSide(color: AppTheme.borderSubtle),
+              ),
+            ),
             child: TabBar(
               controller: _tabController,
               isScrollable: _availableSessions.length > 4,
-              indicatorColor: AppTheme.primaryRed,
-              labelColor: AppTheme.primaryRed,
-              unselectedLabelColor: AppTheme.textSecondary,
               tabs: _availableSessions.map((s) => Tab(text: _sessionLabel(s))).toList(),
             ),
           ),
-        // Conteudo da sessao selecionada
+        // Conteúdo da sessão selecionada
         if (_tabController != null)
           Expanded(
             child: TabBarView(
@@ -245,30 +245,76 @@ class _LiveScreenState extends State<LiveScreen> with SingleTickerProviderStateM
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16),
-      color: AppTheme.cardBackground,
+      decoration: BoxDecoration(
+        color: AppTheme.cardBackground,
+        gradient: LinearGradient(
+          colors: [
+            AppTheme.primaryGreen.withValues(alpha: 0.06),
+            AppTheme.cardBackground,
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+      ),
       child: Row(
         children: [
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(raceName, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.textPrimary)),
+                Text(
+                  raceName,
+                  style: AppTheme.displayStyle(fontSize: 18),
+                ),
                 if (sessionType != null)
-                  Text('Sessao ativa: ${_sessionLabel(sessionType)}', style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 6,
+                          height: 6,
+                          decoration: BoxDecoration(
+                            color: AppTheme.primaryGreen,
+                            shape: BoxShape.circle,
+                            boxShadow: AppTheme.glowShadow(blur: 6),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          'Sessão ativa: ${_sessionLabel(sessionType)}',
+                          style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                        ),
+                      ],
+                    ),
+                  ),
               ],
             ),
           ),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             decoration: BoxDecoration(
-              color: AppTheme.primaryRed.withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppTheme.primaryRed.withValues(alpha: 0.4)),
+              gradient: LinearGradient(
+                colors: [
+                  AppTheme.primaryGreen.withValues(alpha: 0.15),
+                  AppTheme.primaryGreen.withValues(alpha: 0.05),
+                ],
+              ),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: AppTheme.primaryGreen.withValues(alpha: 0.3)),
             ),
             child: Column(
               children: [
-                const Text('Pts Provisorios', style: TextStyle(fontSize: 10, color: AppTheme.textSecondary)),
-                Text('$totalPts', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: AppTheme.primaryRed)),
+                const Text('Pts Provisórios', style: TextStyle(fontSize: 10, color: AppTheme.textSecondary)),
+                const SizedBox(height: 2),
+                Text(
+                  '$totalPts',
+                  style: GoogleFonts.exo2(
+                    fontSize: 26,
+                    fontWeight: FontWeight.w800,
+                    color: AppTheme.primaryGreen,
+                  ),
+                ),
               ],
             ),
           ),
@@ -288,19 +334,25 @@ class _LiveScreenState extends State<LiveScreen> with SingleTickerProviderStateM
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.hourglass_empty, size: 48, color: Colors.grey),
-            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: AppTheme.surfaceColor,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.hourglass_empty, size: 40, color: AppTheme.textSecondary),
+            ),
+            const SizedBox(height: 16),
             Text('${_sessionLabel(sessionType)} - Aguardando resultados',
-              style: const TextStyle(color: AppTheme.textSecondary)),
+              style: const TextStyle(color: AppTheme.textSecondary, fontWeight: FontWeight.w500)),
             const SizedBox(height: 4),
-            const Text('Os resultados aparecerao aqui quando o admin atualizar.',
-              style: TextStyle(fontSize: 12, color: Colors.grey)),
+            const Text('Os resultados aparecerão aqui quando o admin atualizar.',
+              style: TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
           ],
         ),
       );
     }
 
-    // Build scoring map for this session's drivers
     final scoringDrivers = (_scoring?['drivers'] as List?)?.cast<Map<String, dynamic>>() ?? [];
     final scoringMap = <int, Map<String, dynamic>>{};
     for (final d in scoringDrivers) {
@@ -314,16 +366,19 @@ class _LiveScreenState extends State<LiveScreen> with SingleTickerProviderStateM
       },
       child: ListView(
         children: [
-          // Race control messages
           if (raceControl.isNotEmpty) _buildRaceControl(raceControl),
-          // Timestamp
           if (updatedAt != null)
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-              child: Text('Atualizado: ${_formatTime(updatedAt)}',
-                style: const TextStyle(fontSize: 11, color: Colors.grey)),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+              child: Row(
+                children: [
+                  Icon(Icons.update, size: 12, color: AppTheme.textSecondary),
+                  const SizedBox(width: 4),
+                  Text('Atualizado: ${_formatTime(updatedAt)}',
+                    style: const TextStyle(fontSize: 11, color: AppTheme.textSecondary)),
+                ],
+              ),
             ),
-          // Results table
           _buildResultsTable(results, scoringMap),
         ],
       ),
@@ -331,8 +386,8 @@ class _LiveScreenState extends State<LiveScreen> with SingleTickerProviderStateM
   }
 
   Widget _buildRaceControl(List<Map<String, dynamic>> messages) {
-    return Container(
-      margin: const EdgeInsets.all(8),
+    return Padding(
+      padding: const EdgeInsets.all(10),
       child: Column(
         children: messages.take(5).map((msg) {
           final flag = msg['flag'] as String?;
@@ -344,12 +399,8 @@ class _LiveScreenState extends State<LiveScreen> with SingleTickerProviderStateM
 
           return Container(
             margin: const EdgeInsets.only(bottom: 4),
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: flagColor.withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(6),
-              border: Border.all(color: flagColor.withValues(alpha: 0.4)),
-            ),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: AppTheme.chipDecoration(flagColor),
             child: Row(
               children: [
                 if (flag != null) ...[
@@ -373,54 +424,91 @@ class _LiveScreenState extends State<LiveScreen> with SingleTickerProviderStateM
   Widget _buildResultsTable(List<Map<String, dynamic>> results, Map<int, Map<String, dynamic>> scoringMap) {
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.symmetric(horizontal: 8),
       child: DataTable(
-        columnSpacing: 16,
-        headingRowColor: WidgetStateProperty.all(AppTheme.cardBackground),
+        columnSpacing: 14,
+        headingRowHeight: 44,
+        dataRowMinHeight: 42,
+        dataRowMaxHeight: 42,
+        headingRowColor: WidgetStateProperty.all(AppTheme.surfaceColor.withValues(alpha: 0.5)),
+        headingTextStyle: GoogleFonts.exo2(
+          fontWeight: FontWeight.w700,
+          fontSize: 12,
+          color: AppTheme.textSecondary,
+        ),
         columns: const [
-          DataColumn(label: Text('P', style: TextStyle(fontWeight: FontWeight.bold))),
-          DataColumn(label: Text('Piloto', style: TextStyle(fontWeight: FontWeight.bold))),
-          DataColumn(label: Text('Equipe', style: TextStyle(fontWeight: FontWeight.bold))),
-          DataColumn(label: Text('Tempo', style: TextStyle(fontWeight: FontWeight.bold))),
-          DataColumn(label: Text('Gap', style: TextStyle(fontWeight: FontWeight.bold))),
-          DataColumn(label: Text('Pneu', style: TextStyle(fontWeight: FontWeight.bold))),
-          DataColumn(label: Text('Pits', style: TextStyle(fontWeight: FontWeight.bold))),
-          DataColumn(label: Text('Pts', style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.primaryRed))),
+          DataColumn(label: Text('P')),
+          DataColumn(label: Text('Piloto')),
+          DataColumn(label: Text('Equipe')),
+          DataColumn(label: Text('Tempo')),
+          DataColumn(label: Text('Gap')),
+          DataColumn(label: Text('Pneu')),
+          DataColumn(label: Text('Pits')),
+          DataColumn(label: Text('Pts')),
         ],
         rows: results.map((r) {
           final driverId = r['driverId'] as int;
           final scoring = scoringMap[driverId];
           final pts = scoring?['provisionalPoints'] ?? 0;
           final predicted = scoring?['predictedPosition'];
+          final pos = r['position'] as int? ?? 0;
 
-          Color ptsColor = Colors.grey;
-          if (pts > 15) {
-            ptsColor = Colors.green;
-          } else if (pts >= 10) ptsColor = Colors.orange;
-          else if (pts > 0) ptsColor = AppTheme.primaryRed;
+          final ptsColor = pts > 15
+              ? AppTheme.primaryGreen
+              : pts >= 10
+                  ? AppTheme.warningOrange
+                  : pts > 0
+                      ? AppTheme.accentCyan
+                      : AppTheme.textSecondary;
 
           final teamColor = _parseColor(r['teamColor']);
 
+          // Destaque para top 3
+          Color? rowBg;
+          if (pos == 1) rowBg = const Color(0xFFFFD700).withValues(alpha: 0.04);
+          else if (pos == 2) rowBg = const Color(0xFFC0C0C0).withValues(alpha: 0.04);
+          else if (pos == 3) rowBg = const Color(0xFFCD7F32).withValues(alpha: 0.04);
+
           return DataRow(
+            color: rowBg != null ? WidgetStateProperty.all(rowBg) : null,
             cells: [
-              DataCell(Text('${r['position']}', style: const TextStyle(fontWeight: FontWeight.bold))),
+              DataCell(Text(
+                '${r['position']}',
+                style: GoogleFonts.exo2(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13,
+                  color: pos <= 3 ? _medalColor(pos) : AppTheme.textPrimary,
+                ),
+              )),
               DataCell(Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   if (teamColor != null)
-                    Container(width: 3, height: 20, margin: const EdgeInsets.only(right: 6), color: teamColor),
-                  Text(r['abbreviation'] ?? '???', style: const TextStyle(fontWeight: FontWeight.bold)),
+                    Container(
+                      width: 3, height: 20,
+                      margin: const EdgeInsets.only(right: 6),
+                      decoration: BoxDecoration(
+                        color: teamColor,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  Text(r['abbreviation'] ?? '???',
+                      style: GoogleFonts.exo2(fontWeight: FontWeight.w700, fontSize: 13)),
                   if (predicted != null) ...[
                     const SizedBox(width: 4),
-                    Text('(P$predicted)', style: const TextStyle(fontSize: 10, color: Colors.grey)),
+                    Text('(P$predicted)', style: const TextStyle(fontSize: 10, color: AppTheme.textSecondary)),
                   ],
                 ],
               )),
               DataCell(Text(r['teamName'] ?? '', style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary))),
-              DataCell(Text(r['bestLapTime'] ?? '-', style: const TextStyle(fontSize: 12))),
-              DataCell(Text(r['gap'] ?? '-', style: const TextStyle(fontSize: 12))),
+              DataCell(Text(r['bestLapTime'] ?? '-', style: GoogleFonts.exo2(fontSize: 12))),
+              DataCell(Text(r['gap'] ?? '-', style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary))),
               DataCell(_buildTireChip(r['tireCompound'])),
               DataCell(Text('${r['pitStops'] ?? 0}', style: const TextStyle(fontSize: 12))),
-              DataCell(Text('+$pts', style: TextStyle(fontWeight: FontWeight.bold, color: ptsColor))),
+              DataCell(Text(
+                '+$pts',
+                style: GoogleFonts.exo2(fontWeight: FontWeight.w700, fontSize: 13, color: ptsColor),
+              )),
             ],
           );
         }).toList(),
@@ -431,25 +519,30 @@ class _LiveScreenState extends State<LiveScreen> with SingleTickerProviderStateM
   Widget _buildTireChip(String? compound) {
     if (compound == null || compound.isEmpty) return const Text('-', style: TextStyle(fontSize: 12));
 
-    Color color;
-    switch (compound.toUpperCase()) {
-      case 'SOFT': color = Colors.red;
-      case 'MEDIUM': color = Colors.yellow;
-      case 'HARD': color = Colors.white;
-      case 'INTERMEDIATE': color = Colors.green;
-      case 'WET': color = Colors.blue;
-      default: color = Colors.grey;
-    }
+    final color = switch (compound.toUpperCase()) {
+      'SOFT' => Colors.red,
+      'MEDIUM' => Colors.yellow,
+      'HARD' => Colors.white,
+      'INTERMEDIATE' => Colors.green,
+      'WET' => Colors.blue,
+      _ => Colors.grey,
+    };
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.2),
-        borderRadius: BorderRadius.circular(4),
-        border: Border.all(color: color.withValues(alpha: 0.5)),
+        color: color.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: color.withValues(alpha: 0.4)),
       ),
       child: Text(compound[0], style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: color)),
     );
+  }
+
+  Color _medalColor(int position) {
+    if (position == 1) return const Color(0xFFFFD700);
+    if (position == 2) return const Color(0xFFC0C0C0);
+    return const Color(0xFFCD7F32);
   }
 
   Color? _parseColor(String? hex) {

@@ -152,7 +152,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     children: [
                       Text(
                         'Criar Conta',
-                        style: Theme.of(context).textTheme.headlineLarge,
+                        style: AppTheme.displayStyle(fontSize: 28),
                         textAlign: TextAlign.center,
                       ),
                       const SizedBox(height: 8),
@@ -358,9 +358,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                           .read<AuthBloc>()
                                           .add(AuthGoogleLoginRequested()),
                                   style: OutlinedButton.styleFrom(
-                                    backgroundColor: Colors.white,
-                                    foregroundColor: const Color(0xFF3C4043),
-                                    side: const BorderSide(color: Color(0xFFDADCE0)),
+                                    backgroundColor: const Color(0xFF1A2332),
+                                    foregroundColor: AppTheme.textPrimary,
+                                    side: const BorderSide(color: AppTheme.borderMedium),
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(12),
                                     ),
