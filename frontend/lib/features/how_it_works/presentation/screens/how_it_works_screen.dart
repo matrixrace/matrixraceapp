@@ -17,14 +17,7 @@ class HowItWorksScreen extends StatelessWidget {
               width: double.infinity,
               padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 20),
               decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    AppTheme.primaryGreen.withValues(alpha: 0.18),
-                    AppTheme.cardBackground,
-                  ],
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                ),
+                color: AppTheme.cardBackground,
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(
                     color: AppTheme.primaryGreen.withValues(alpha: 0.3)),

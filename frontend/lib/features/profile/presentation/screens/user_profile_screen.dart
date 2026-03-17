@@ -128,11 +128,12 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
               Container(
                 height: 120,
                 decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      AppTheme.primaryRed.withValues(alpha: 0.7),
-                      AppTheme.primaryRed.withValues(alpha: 0.3),
-                    ],
+                  color: AppTheme.surfaceColor,
+                  border: Border(
+                    bottom: BorderSide(
+                      color: AppTheme.primaryGreen.withValues(alpha: 0.3),
+                      width: 2,
+                    ),
                   ),
                 ),
               ),

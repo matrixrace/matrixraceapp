@@ -77,16 +77,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return Container(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(20),
-        gradient: LinearGradient(
-          colors: [
-            AppTheme.primaryGreen.withValues(alpha: 0.08),
-            AppTheme.cardBackground,
-            AppTheme.cardBackground,
-          ],
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          stops: const [0.0, 0.35, 1.0],
-        ),
+        color: AppTheme.cardBackground,
         border: Border.all(color: AppTheme.borderSubtle),
       ),
       child: Padding(

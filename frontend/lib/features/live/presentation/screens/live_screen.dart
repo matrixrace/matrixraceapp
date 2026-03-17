@@ -247,13 +247,8 @@ class _LiveScreenState extends State<LiveScreen> with SingleTickerProviderStateM
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppTheme.cardBackground,
-        gradient: LinearGradient(
-          colors: [
-            AppTheme.primaryGreen.withValues(alpha: 0.06),
-            AppTheme.cardBackground,
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
+        border: Border(
+          bottom: BorderSide(color: AppTheme.primaryGreen.withValues(alpha: 0.15)),
         ),
       ),
       child: Row(
@@ -294,12 +289,7 @@ class _LiveScreenState extends State<LiveScreen> with SingleTickerProviderStateM
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  AppTheme.primaryGreen.withValues(alpha: 0.15),
-                  AppTheme.primaryGreen.withValues(alpha: 0.05),
-                ],
-              ),
+              color: AppTheme.surfaceColor,
               borderRadius: BorderRadius.circular(14),
               border: Border.all(color: AppTheme.primaryGreen.withValues(alpha: 0.3)),
             ),

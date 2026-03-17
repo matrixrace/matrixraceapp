@@ -80,14 +80,7 @@ class _MainShellState extends State<MainShell> {
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          AppTheme.primaryGreen.withValues(alpha: 0.15),
-                          AppTheme.primaryGreen.withValues(alpha: 0.05),
-                        ],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
+                      color: AppTheme.primaryGreen.withValues(alpha: 0.1),
                       shape: BoxShape.circle,
                       border: Border.all(
                         color: AppTheme.primaryGreen.withValues(alpha: 0.2),
@@ -190,15 +183,7 @@ class _MainShellState extends State<MainShell> {
               preferredSize: const Size.fromHeight(1),
               child: Container(
                 height: 1,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      Colors.transparent,
-                      AppTheme.primaryGreen.withValues(alpha: 0.15),
-                      Colors.transparent,
-                    ],
-                  ),
-                ),
+                color: AppTheme.borderSubtle,
               ),
             ),
           ),

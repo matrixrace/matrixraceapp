@@ -324,11 +324,11 @@ class _RankingsScreenState extends State<RankingsScreen> {
         child: Container(
           decoration: isTop3
               ? BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      _medalColor(position).withValues(alpha: 0.06),
-                      Colors.transparent,
-                    ],
+                  border: Border(
+                    left: BorderSide(
+                      color: _medalColor(position).withValues(alpha: 0.6),
+                      width: 3,
+                    ),
                   ),
                 )
               : null,

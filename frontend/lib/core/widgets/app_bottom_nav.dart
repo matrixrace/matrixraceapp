@@ -19,18 +19,10 @@ class AppBottomNav extends StatelessWidget {
         return Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Linha de brilho sutil no topo
+            // Linha sutil no topo
             Container(
               height: 1,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    Colors.transparent,
-                    AppTheme.primaryGreen.withValues(alpha: 0.12),
-                    Colors.transparent,
-                  ],
-                ),
-              ),
+              color: AppTheme.borderSubtle,
             ),
             NavigationBar(
               backgroundColor: AppTheme.cardBackground,

@@ -208,24 +208,15 @@ class _HomeScreenState extends State<HomeScreen> {
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(20),
-        gradient: LinearGradient(
-          colors: [
-            AppTheme.primaryGreen.withValues(alpha: 0.15),
-            AppTheme.cardBackground,
-            AppTheme.cardBackground,
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          stops: const [0.0, 0.4, 1.0],
-        ),
+        color: AppTheme.cardBackground,
         border: Border.all(
-          color: AppTheme.primaryGreen.withValues(alpha: 0.2),
+          color: AppTheme.primaryGreen.withValues(alpha: 0.25),
         ),
         boxShadow: [
           BoxShadow(
-            color: AppTheme.primaryGreen.withValues(alpha: 0.08),
-            blurRadius: 24,
-            offset: const Offset(0, 8),
+            color: Colors.black.withValues(alpha: 0.3),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
