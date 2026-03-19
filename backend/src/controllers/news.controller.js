@@ -1,6 +1,4 @@
-const { db } = require('../config/database');
-const { news } = require('../db/schema');
-const { desc, eq, sql, and } = require('drizzle-orm');
+const { pool } = require('../config/database');
 const { successResponse, errorResponse } = require('../utils/helpers');
 
 /**
@@ -14,30 +12,24 @@ async function getNews(req, res, next) {
     const lang = req.query.lang || 'pt';
     const offset = (page - 1) * limit;
 
-    // Total de notícias publicadas
-    const [{ count }] = await db
-      .select({ count: sql`COUNT(*)::int` })
-      .from(news)
-      .where(eq(news.isPublished, true));
+    const countResult = await pool.query(
+      'SELECT COUNT(*)::int as count FROM news WHERE is_published = true'
+    );
+    const total = countResult.rows[0]?.count || 0;
 
-    // Buscar notícias com paginação
-    const rows = await db
-      .select()
-      .from(news)
-      .where(eq(news.isPublished, true))
-      .orderBy(desc(news.publishedAt))
-      .limit(limit)
-      .offset(offset);
+    const dataResult = await pool.query(
+      'SELECT * FROM news WHERE is_published = true ORDER BY published_at DESC LIMIT $1 OFFSET $2',
+      [limit, offset]
+    );
 
-    // Formatar para o idioma solicitado
-    const formatted = rows.map(row => formatNewsItem(row, lang));
+    const formatted = dataResult.rows.map(row => formatNewsItem(row, lang));
 
     res.json(successResponse({
       news: formatted,
-      total: count,
+      total,
       page,
       limit,
-      totalPages: Math.ceil(count / limit),
+      totalPages: Math.ceil(total / limit),
     }));
   } catch (err) {
     next(err);
@@ -50,19 +42,23 @@ async function getNews(req, res, next) {
  */
 async function getNewsById(req, res, next) {
   try {
-    const { id } = req.params;
+    const id = parseInt(req.params.id);
     const lang = req.query.lang || 'pt';
 
-    const [row] = await db
-      .select()
-      .from(news)
-      .where(and(eq(news.id, parseInt(id)), eq(news.isPublished, true)));
+    if (isNaN(id)) {
+      return res.status(400).json(errorResponse('ID inválido'));
+    }
 
-    if (!row) {
+    const result = await pool.query(
+      'SELECT * FROM news WHERE id = $1 AND is_published = true',
+      [id]
+    );
+
+    if (result.rows.length === 0) {
       return res.status(404).json(errorResponse('Notícia não encontrada'));
     }
 
-    res.json(successResponse(formatNewsItem(row, lang)));
+    res.json(successResponse(formatNewsItem(result.rows[0], lang)));
   } catch (err) {
     next(err);
   }
@@ -81,7 +77,8 @@ function formatNewsItem(row, lang) {
 
   let sourceUrls = [];
   try {
-    sourceUrls = typeof row.sourceUrls === 'string' ? JSON.parse(row.sourceUrls) : row.sourceUrls;
+    const raw = row.source_urls || row.sourceUrls;
+    sourceUrls = typeof raw === 'string' ? JSON.parse(raw) : (raw || []);
   } catch (e) {
     sourceUrls = [];
   }
@@ -91,15 +88,15 @@ function formatNewsItem(row, lang) {
 
   return {
     id: row.id,
-    title: t.title || row.originalTitle || '',
+    title: t.title || row.original_title || '',
     summary: t.summary || '',
     sourceUrls,
-    sourceNames: row.sourceNames || '',
-    imageUrl: row.imageUrl,
+    sourceNames: row.source_names || '',
+    imageUrl: row.image_url || null,
     category: row.category || 'general',
-    isUpdate: row.isUpdate || false,
-    publishedAt: row.publishedAt,
-    createdAt: row.createdAt,
+    isUpdate: row.is_update || false,
+    publishedAt: row.published_at,
+    createdAt: row.created_at,
   };
 }
 
