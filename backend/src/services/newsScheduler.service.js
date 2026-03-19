@@ -1,8 +1,6 @@
 const cron = require('node-cron');
 const crypto = require('crypto');
-const { db } = require('../config/database');
-const { news } = require('../db/schema');
-const { desc, sql, gte } = require('drizzle-orm');
+const { pool } = require('../config/database');
 const { fetchAllFeeds } = require('../utils/rss');
 const { callMiniMaxJSON } = require('../utils/minimax');
 const logger = require('../utils/logger');
@@ -57,11 +55,11 @@ function computeTitleHash(title) {
  */
 async function getRecentHashes() {
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-  const rows = await db
-    .select({ titleHash: news.titleHash })
-    .from(news)
-    .where(gte(news.publishedAt, sevenDaysAgo));
-  return new Set(rows.map(r => r.titleHash));
+  const result = await pool.query(
+    'SELECT title_hash FROM news WHERE published_at >= $1',
+    [sevenDaysAgo]
+  );
+  return new Set(result.rows.map(r => r.title_hash));
 }
 
 /**
@@ -143,18 +141,23 @@ async function fetchAndProcessNews() {
           en: { title: article.title_en || article.title_pt, summary: article.summary_en || article.summary_pt },
         });
 
-        await db.insert(news).values({
-          titleHash,
-          originalTitle: mainTitle.substring(0, 500),
-          translations,
-          sourceUrls: JSON.stringify(article.source_urls || []),
-          sourceNames: (article.source_names || []).join(', '),
-          imageUrl: article.image_url || null,
-          category: article.category || 'general',
-          isUpdate: false,
-          isPublished: true,
-          publishedAt: new Date(),
-        }).onConflictDoNothing({ target: news.titleHash });
+        await pool.query(
+          `INSERT INTO news (title_hash, original_title, translations, source_urls, source_names, image_url, category, is_update, is_published, published_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+           ON CONFLICT (title_hash) DO NOTHING`,
+          [
+            titleHash,
+            mainTitle.substring(0, 500),
+            translations,
+            JSON.stringify(article.source_urls || []),
+            (article.source_names || []).join(', '),
+            article.image_url || null,
+            article.category || 'general',
+            false,
+            true,
+            new Date(),
+          ]
+        );
 
         inserted++;
       } catch (err) {
