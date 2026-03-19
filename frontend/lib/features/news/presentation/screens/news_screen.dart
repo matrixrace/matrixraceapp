@@ -37,14 +37,7 @@ class _NewsScreenState extends State<NewsScreen> {
     super.dispose();
   }
 
-  String get _lang {
-    try {
-      final locale = Localizations.localeOf(context);
-      return locale.languageCode;
-    } catch (_) {
-      return 'pt';
-    }
-  }
+  String get _lang => 'pt';
 
   Future<void> _loadNews({bool append = false}) async {
     if (!append) {
