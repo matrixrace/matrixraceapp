@@ -1,5 +1,5 @@
 const { pool } = require('../config/database');
-const { successResponse, errorResponse } = require('../utils/helpers');
+const { successResponse } = require('../utils/helpers');
 
 /**
  * GET /api/v1/news?page=1&limit=20&lang=pt
@@ -46,7 +46,7 @@ async function getNewsById(req, res, next) {
     const lang = req.query.lang || 'pt';
 
     if (isNaN(id)) {
-      return res.status(400).json(errorResponse('ID inválido'));
+      return res.status(400).json({ success: false, message: 'ID inválido' });
     }
 
     const result = await pool.query(
@@ -55,7 +55,7 @@ async function getNewsById(req, res, next) {
     );
 
     if (result.rows.length === 0) {
-      return res.status(404).json(errorResponse('Notícia não encontrada'));
+      return res.status(404).json({ success: false, message: 'Notícia não encontrada' });
     }
 
     res.json(successResponse(formatNewsItem(result.rows[0], lang)));
