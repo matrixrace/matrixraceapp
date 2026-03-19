@@ -144,6 +144,9 @@ class _HomeScreenState extends State<HomeScreen> {
               .slideY(begin: 0.05, end: 0),
           const SizedBox(height: 28),
         ],
+        // Acesso rápido ao Histórico de Resultados
+        _buildHistoryShortcut(),
+        const SizedBox(height: 20),
         Text(
           key: TutorialKeys.homeCalendar,
           'Calendário',
@@ -458,6 +461,50 @@ class _HomeScreenState extends State<HomeScreen> {
                   )
                 else
                   Icon(Icons.chevron_right, color: AppTheme.textSecondary, size: 20),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHistoryShortcut() {
+    return Container(
+      decoration: AppTheme.cardDecoration(),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: () => context.push('/f1-results'),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            child: Row(
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: AppTheme.accentGold.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: AppTheme.accentGold.withValues(alpha: 0.2)),
+                  ),
+                  child: const Icon(Icons.emoji_events, size: 20, color: AppTheme.accentGold),
+                ),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Histórico de Resultados',
+                          style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                      SizedBox(height: 2),
+                      Text('Veja os resultados das temporadas anteriores',
+                          style: TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
+                    ],
+                  ),
+                ),
+                const Icon(Icons.chevron_right, color: AppTheme.textSecondary, size: 20),
               ],
             ),
           ),

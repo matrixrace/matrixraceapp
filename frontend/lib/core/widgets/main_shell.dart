@@ -147,7 +147,7 @@ class _MainShellState extends State<MainShell> {
     if (loc.startsWith('/live')) return 1;
     if (loc.startsWith('/leagues')) return 2;
     if (loc.startsWith('/rankings')) return 3;
-    if (loc.startsWith('/f1-results')) return 4;
+    if (loc.startsWith('/news')) return 4;
     if (loc.startsWith('/profile')) return 5;
     return 0;
   }

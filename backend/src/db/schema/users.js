@@ -12,6 +12,7 @@ const users = pgTable('users', {
   country: varchar('country', { length: 100 }),
   state: varchar('state', { length: 100 }),
   city: varchar('city', { length: 100 }),
+  language: varchar('language', { length: 5 }).default('pt'),
   isAdmin: boolean('is_admin').default(false),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),

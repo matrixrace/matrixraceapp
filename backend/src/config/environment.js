@@ -41,6 +41,13 @@ const config = {
 
   // API Key para integracao externa (Claude, scripts, etc.)
   liveApiKey: process.env.LIVE_API_KEY || null,
+
+  // MiniMax AI (notícias F1)
+  minimax: {
+    apiKey: process.env.MINIMAX_API_KEY,
+    model: process.env.MINIMAX_MODEL || 'MiniMax-M2.1',
+    baseUrl: process.env.MINIMAX_BASE_URL || 'https://api.minimax.chat',
+  },
 };
 
 module.exports = config;

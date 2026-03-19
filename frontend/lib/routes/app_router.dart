@@ -22,6 +22,7 @@ import '../features/profile/presentation/screens/user_profile_screen.dart';
 import '../features/admin/presentation/screens/admin_user_leagues_screen.dart';
 import '../features/how_it_works/presentation/screens/how_it_works_screen.dart';
 import '../features/live/presentation/screens/live_screen.dart';
+import '../features/news/presentation/screens/news_screen.dart';
 
 /// Configuração de rotas do app
 class AppRouter {
@@ -75,10 +76,16 @@ class AppRouter {
             builder: (context, state) => const LiveScreen(),
           ),
           GoRoute(
-            path: '/f1-results',
-            builder: (context, state) => const F1ResultsScreen(),
+            path: '/news',
+            builder: (context, state) => const NewsScreen(),
           ),
         ],
+      ),
+
+      // Histórico de resultados F1 (removido do shell, agora é rota secundária)
+      GoRoute(
+        path: '/f1-results',
+        pageBuilder: (context, state) => _fadeTransition(state, const F1ResultsScreen()),
       ),
 
       // ── Telas secundárias (AppBar próprio, sem bottom nav) ───

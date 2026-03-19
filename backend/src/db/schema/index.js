@@ -30,6 +30,7 @@ const { chatGroupMembers } = require('./chatGroupMembers');
 const { messageReadReceipts } = require('./messageReadReceipts');
 const { sessionResults } = require('./sessionResults');
 const { raceControlMessages } = require('./raceControlMessages');
+const { news } = require('./news');
 
 module.exports = {
   users,
@@ -61,4 +62,5 @@ module.exports = {
   messageReadReceipts,
   sessionResults,
   raceControlMessages,
+  news,
 };

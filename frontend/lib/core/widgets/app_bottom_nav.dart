@@ -38,7 +38,7 @@ class AppBottomNav extends StatelessWidget {
                   case 3:
                     context.go('/rankings');
                   case 4:
-                    context.go('/f1-results');
+                    context.go('/news');
                   case 5:
                     context.go('/profile');
                 }
@@ -65,9 +65,9 @@ class AppBottomNav extends StatelessWidget {
                   label: 'Ranking',
                 ),
                 NavigationDestination(
-                  icon: Icon(Icons.emoji_events_outlined),
-                  selectedIcon: Icon(Icons.emoji_events),
-                  label: 'Histórico',
+                  icon: Icon(Icons.newspaper_outlined),
+                  selectedIcon: Icon(Icons.newspaper),
+                  label: 'News',
                 ),
                 NavigationDestination(
                   icon: Icon(Icons.person_outline),

@@ -526,6 +526,34 @@ async function migrate() {
     `);
     console.log('✓ Tabela race_control_messages criada');
 
+    // =============================================
+    // NOTÍCIAS F1 (NEWS)
+    // =============================================
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS news (
+        id SERIAL PRIMARY KEY,
+        title_hash VARCHAR(64) UNIQUE NOT NULL,
+        original_title VARCHAR(500),
+        translations TEXT NOT NULL,
+        source_urls TEXT NOT NULL,
+        source_names VARCHAR(500),
+        image_url TEXT,
+        category VARCHAR(50),
+        is_update BOOLEAN DEFAULT FALSE,
+        parent_news_id INTEGER REFERENCES news(id) ON DELETE SET NULL,
+        is_published BOOLEAN DEFAULT TRUE,
+        published_at TIMESTAMP NOT NULL,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      );
+    `);
+    console.log('✓ Tabela news criada');
+
+    // Adiciona coluna language na tabela users
+    await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS language VARCHAR(5) DEFAULT 'pt'`);
+    console.log('✓ Coluna language adicionada em users');
+
     // Criar índices para melhor performance
     console.log('\nCriando índices...');
 
@@ -561,6 +589,8 @@ async function migrate() {
       'CREATE INDEX IF NOT EXISTS idx_session_results_race ON session_results(race_id, session_type);',
       'CREATE INDEX IF NOT EXISTS idx_session_results_driver ON session_results(driver_id);',
       'CREATE INDEX IF NOT EXISTS idx_race_control_race ON race_control_messages(race_id, session_type);',
+      'CREATE INDEX IF NOT EXISTS idx_news_published_at ON news(published_at DESC);',
+      'CREATE INDEX IF NOT EXISTS idx_news_is_published ON news(is_published);',
     ];
 
     for (const idx of indexes) {

@@ -25,6 +25,7 @@ const notificationsRoutes = require('./routes/notifications.routes');
 const f1ResultsRoutes = require('./routes/f1results.routes');
 const chatGroupsRoutes = require('./routes/chatGroups.routes');
 const liveRoutes = require('./routes/live.routes');
+const newsRoutes = require('./routes/news.routes');
 
 // Cria o app Express e o servidor HTTP (necessário para Socket.io)
 const app = express();
@@ -116,6 +117,7 @@ app.use('/api/v1/notifications', notificationsRoutes);
 app.use('/api/v1/f1-results', f1ResultsRoutes);
 app.use('/api/v1/chat-groups', chatGroupsRoutes);
 app.use('/api/v1/live', liveRoutes);
+app.use('/api/v1/news', newsRoutes);
 
 // ==================
 // PROXY: Firebase Auth Handler (necessário para custom authDomain)
@@ -223,6 +225,14 @@ async function start() {
       sessionScheduler.start();
     } catch (err) {
       logger.error('Erro ao iniciar session scheduler:', err.message);
+    }
+
+    // Inicia agendador de notícias F1 (a cada 4 horas)
+    try {
+      const newsScheduler = require('./services/newsScheduler.service');
+      newsScheduler.start();
+    } catch (err) {
+      logger.error('Erro ao iniciar news scheduler:', err.message);
     }
   });
 }
