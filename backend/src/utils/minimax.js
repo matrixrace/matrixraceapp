@@ -82,10 +82,18 @@ function callMiniMax(systemPrompt, userMessage, options = {}) {
  */
 async function callMiniMaxJSON(systemPrompt, userMessage, options = {}) {
   const raw = await callMiniMax(systemPrompt, userMessage, options);
+  // MiniMax M2.1 pode incluir <think>...</think> antes do JSON — remover
+  const cleaned = raw.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
+  // Extrair o primeiro bloco JSON da resposta
+  const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) {
+    logger.error(`[MiniMax] Nenhum JSON encontrado na resposta: ${raw.substring(0, 500)}`);
+    throw new Error('MiniMax não retornou JSON válido');
+  }
   try {
-    return JSON.parse(raw);
+    return JSON.parse(jsonMatch[0]);
   } catch (e) {
-    logger.error(`[MiniMax] Resposta não é JSON válido: ${raw.substring(0, 500)}`);
+    logger.error(`[MiniMax] JSON inválido: ${jsonMatch[0].substring(0, 500)}`);
     throw new Error('MiniMax não retornou JSON válido');
   }
 }
