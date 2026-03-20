@@ -9,6 +9,8 @@ let _cronTask = null;
 let _lastRun = null;
 let _runCount = 0;
 let _isRunning = false;
+let _lastDiag = null;
+let _runHistory = []; // últimas 10 execuções
 
 const SYSTEM_PROMPT = `Você é um editor de notícias de Fórmula 1. Receba uma lista de artigos recentes de diversos portais de F1.
 
@@ -65,10 +67,13 @@ async function getRecentHashes() {
 /**
  * Executa o ciclo completo de busca, análise e inserção de notícias.
  */
-async function fetchAndProcessNews() {
+async function fetchAndProcessNews(options = {}) {
+  const diag = { steps: [], inserted: 0, insertErrors: [] };
+
   if (_isRunning) {
     logger.info('[NewsScheduler] Já existe um ciclo em execução, pulando...');
-    return;
+    diag.steps.push('skipped-already-running');
+    return diag;
   }
 
   _isRunning = true;
@@ -78,27 +83,37 @@ async function fetchAndProcessNews() {
   try {
     logger.info('[NewsScheduler] Iniciando ciclo de busca de notícias...');
 
-    // 1. Buscar RSS feeds (últimas 5h para margem de segurança)
-    const articles = await fetchAllFeeds(5);
+    // 1. Buscar RSS feeds (últimas 8h para margem de segurança com ciclo de 4h)
+    diag.steps.push('1-rss-start');
+    const articles = await fetchAllFeeds(8);
+    diag.rssCount = articles.length;
+    diag.rssSample = articles.slice(0, 5).map(a => ({ title: a.title, source: a.sourceName }));
+    diag.steps.push('1-rss-ok');
     logger.info(`[NewsScheduler] ${articles.length} artigos encontrados nos feeds`);
 
     if (articles.length === 0) {
       logger.info('[NewsScheduler] Nenhum artigo novo nos feeds. Encerrando ciclo.');
-      return;
+      diag.steps.push('1-rss-empty');
+      return diag;
     }
 
     // 2. Deduplicação pré-IA
+    diag.steps.push('2-dedup-start');
     const existingHashes = await getRecentHashes();
+    diag.existingHashCount = existingHashes.size;
     const newArticles = articles.filter(a => {
       const hash = computeTitleHash(a.title);
       return !existingHashes.has(hash);
     });
+    diag.afterDedupCount = newArticles.length;
+    diag.steps.push('2-dedup-ok');
 
     logger.info(`[NewsScheduler] ${newArticles.length} artigos após deduplicação (${articles.length - newArticles.length} já conhecidos)`);
 
     if (newArticles.length === 0) {
       logger.info('[NewsScheduler] Todos os artigos já foram processados. Encerrando ciclo.');
-      return;
+      diag.steps.push('2-dedup-all-known');
+      return diag;
     }
 
     // 3. Limitar batch para controle de custo (max 50 artigos)
@@ -116,17 +131,35 @@ async function fetchAndProcessNews() {
     );
 
     // 5. Chamar MiniMax
+    diag.steps.push('3-minimax-start');
+    diag.minimaxInputArticles = batch.length;
     logger.info(`[NewsScheduler] Enviando ${batch.length} artigos para análise IA...`);
-    const result = await callMiniMaxJSON(SYSTEM_PROMPT, userMessage);
+
+    let result;
+    try {
+      result = await callMiniMaxJSON(SYSTEM_PROMPT, userMessage);
+    } catch (mmErr) {
+      diag.minimaxError = mmErr.message;
+      diag.steps.push('3-minimax-fail');
+      logger.error(`[NewsScheduler] Erro MiniMax: ${mmErr.message}`);
+      return diag;
+    }
 
     if (!result?.articles || !Array.isArray(result.articles)) {
       logger.warn('[NewsScheduler] IA retornou formato inválido. Encerrando ciclo.');
-      return;
+      diag.minimaxInvalid = true;
+      diag.steps.push('3-minimax-invalid');
+      return diag;
     }
+
+    diag.minimaxArticlesReturned = result.articles.length;
+    diag.minimaxSample = result.articles[0] ? { title_pt: result.articles[0].title_pt } : null;
+    diag.steps.push('3-minimax-ok');
 
     logger.info(`[NewsScheduler] IA retornou ${result.articles.length} notícias processadas`);
 
     // 6. Inserir no banco de dados
+    diag.steps.push('4-insert-start');
     let inserted = 0;
     for (const article of result.articles) {
       try {
@@ -135,16 +168,16 @@ async function fetchAndProcessNews() {
         const mainTitle = article.original_titles?.[0] || article.title_en || article.title_pt;
         const titleHash = computeTitleHash(mainTitle);
 
-        // Verificar se já existe (ON CONFLICT)
         const translations = JSON.stringify({
           pt: { title: article.title_pt, summary: article.summary_pt },
           en: { title: article.title_en || article.title_pt, summary: article.summary_en || article.summary_pt },
         });
 
-        await pool.query(
+        const insertResult = await pool.query(
           `INSERT INTO news (title_hash, original_title, translations, source_urls, source_names, image_url, category, is_update, is_published, published_at)
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-           ON CONFLICT (title_hash) DO NOTHING`,
+           ON CONFLICT (title_hash) DO NOTHING
+           RETURNING id`,
           [
             titleHash,
             mainTitle.substring(0, 500),
@@ -159,15 +192,29 @@ async function fetchAndProcessNews() {
           ]
         );
 
-        inserted++;
+        if (insertResult.rowCount > 0) {
+          inserted++;
+        }
       } catch (err) {
+        diag.insertErrors.push(err.message);
         logger.warn(`[NewsScheduler] Erro ao inserir notícia: ${err.message}`);
       }
     }
 
+    diag.inserted = inserted;
+    diag.steps.push('4-insert-done');
     logger.info(`[NewsScheduler] Ciclo concluído: ${inserted} notícias inseridas`);
+    _lastDiag = diag;
+    _runHistory.push({ time: _lastRun, inserted, steps: diag.steps.join(',') });
+    if (_runHistory.length > 10) _runHistory.shift();
+    return diag;
   } catch (err) {
+    diag.error = err.message;
     logger.error(`[NewsScheduler] Erro no ciclo: ${err.message}`);
+    _lastDiag = diag;
+    _runHistory.push({ time: _lastRun, error: err.message });
+    if (_runHistory.length > 10) _runHistory.shift();
+    return diag;
   } finally {
     _isRunning = false;
   }
@@ -211,6 +258,8 @@ function getDiagnostics() {
     lastRun: _lastRun,
     runCount: _runCount,
     schedule: '5 */4 * * *',
+    lastDiag: _lastDiag,
+    history: _runHistory,
   };
 }
 
