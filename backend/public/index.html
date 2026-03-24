@@ -36,6 +36,18 @@
   <link rel="manifest" href="manifest.json">
 </head>
 <body>
+  <script>
+    // Auto-reload quando um novo Service Worker assume o controle.
+    // Garante que o usuário veja a versão mais recente com um refresh normal.
+    if ('serviceWorker' in navigator) {
+      let refreshing = false;
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (refreshing) return;
+        refreshing = true;
+        window.location.reload();
+      });
+    }
+  </script>
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>

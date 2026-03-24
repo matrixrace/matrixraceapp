@@ -150,10 +150,14 @@ app.use('/__/auth', (req, res) => {
 
 const publicPath = path.join(__dirname, '..', 'public');
 
-// Service worker e index.html sem cache para sempre pegar versão atualizada
+// Arquivos críticos sem cache para sempre pegar versão atualizada
 app.get('/flutter_service_worker.js', (req, res) => {
   res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
   res.sendFile(path.join(publicPath, 'flutter_service_worker.js'));
+});
+app.get('/flutter_bootstrap.js', (req, res) => {
+  res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.sendFile(path.join(publicPath, 'flutter_bootstrap.js'));
 });
 app.get('/index.html', (req, res) => {
   res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
