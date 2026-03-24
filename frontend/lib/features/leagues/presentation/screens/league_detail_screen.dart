@@ -377,22 +377,31 @@ class _LeagueDetailScreenState extends State<LeagueDetailScreen>
           icon: const Icon(Icons.arrow_back),
           onPressed: () => context.pop(),
         ),
-        title: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Flexible(
-              child: Text(leagueName, overflow: TextOverflow.ellipsis),
+        title: Text(leagueName, overflow: TextOverflow.ellipsis),
+        actions: [
+          if (_isMember || _isOwner)
+            IconButton(
+              icon: const Icon(Icons.share_outlined),
+              tooltip: 'Compartilhar liga',
+              onPressed: _shareLeague,
             ),
-            // Gear para membros não-donos: usa hint da navegação OU _isMember
-            if ((_isMember || widget.isMemberHint == true) && !_isOwner) ...[
-              const SizedBox(width: 4),
-              PopupMenuButton<String>(
-                icon: const Icon(Icons.settings_outlined, size: 20),
-                padding: EdgeInsets.zero,
-                onSelected: (value) {
-                  if (value == 'leave') _leaveLeague();
-                },
-                itemBuilder: (ctx) => [
+          if (_isMember || _isOwner)
+            PopupMenuButton<String>(
+              icon: const Icon(Icons.settings_outlined),
+              onSelected: (value) {
+                if (value == 'mural') _showPostSettings();
+                if (value == 'leave') _leaveLeague();
+              },
+              itemBuilder: (ctx) => [
+                if (_isOwner)
+                  const PopupMenuItem(
+                      value: 'mural',
+                      child: Row(children: [
+                        Icon(Icons.article_outlined, size: 18),
+                        SizedBox(width: 8),
+                        Text('Config. Mural'),
+                      ])),
+                if (!_isOwner)
                   const PopupMenuItem(
                     value: 'leave',
                     child: Row(children: [
@@ -403,32 +412,6 @@ class _LeagueDetailScreenState extends State<LeagueDetailScreen>
                           style: TextStyle(color: Colors.red)),
                     ]),
                   ),
-                ],
-              ),
-            ],
-          ],
-        ),
-        actions: [
-          if (_isMember)
-            IconButton(
-              icon: const Icon(Icons.share_outlined),
-              tooltip: 'Compartilhar liga',
-              onPressed: _shareLeague,
-            ),
-          if (_isOwner)
-            PopupMenuButton<String>(
-              icon: const Icon(Icons.settings_outlined),
-              onSelected: (value) {
-                if (value == 'mural') _showPostSettings();
-              },
-              itemBuilder: (ctx) => [
-                const PopupMenuItem(
-                    value: 'mural',
-                    child: Row(children: [
-                      Icon(Icons.article_outlined, size: 18),
-                      SizedBox(width: 8),
-                      Text('Config. Mural'),
-                    ])),
               ],
             ),
         ],
