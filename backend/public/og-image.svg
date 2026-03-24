@@ -1,0 +1,88 @@
+<svg width="1200" height="630" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#080B12"/>
+      <stop offset="100%" stop-color="#0D1117"/>
+    </linearGradient>
+    <linearGradient id="green" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#00E676"/>
+      <stop offset="100%" stop-color="#00BFA5"/>
+    </linearGradient>
+    <linearGradient id="line" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="transparent"/>
+      <stop offset="50%" stop-color="#00E676" stop-opacity="0.4"/>
+      <stop offset="100%" stop-color="transparent"/>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="8" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="630" fill="url(#bg)"/>
+
+  <!-- Grid pattern -->
+  <g opacity="0.04" stroke="#00E676" stroke-width="1">
+    <line x1="0" y1="0" x2="0" y2="630"/><line x1="60" y1="0" x2="60" y2="630"/>
+    <line x1="120" y1="0" x2="120" y2="630"/><line x1="180" y1="0" x2="180" y2="630"/>
+    <line x1="240" y1="0" x2="240" y2="630"/><line x1="300" y1="0" x2="300" y2="630"/>
+    <line x1="360" y1="0" x2="360" y2="630"/><line x1="420" y1="0" x2="420" y2="630"/>
+    <line x1="480" y1="0" x2="480" y2="630"/><line x1="540" y1="0" x2="540" y2="630"/>
+    <line x1="600" y1="0" x2="600" y2="630"/><line x1="660" y1="0" x2="660" y2="630"/>
+    <line x1="720" y1="0" x2="720" y2="630"/><line x1="780" y1="0" x2="780" y2="630"/>
+    <line x1="840" y1="0" x2="840" y2="630"/><line x1="900" y1="0" x2="900" y2="630"/>
+    <line x1="960" y1="0" x2="960" y2="630"/><line x1="1020" y1="0" x2="1020" y2="630"/>
+    <line x1="1080" y1="0" x2="1080" y2="630"/><line x1="1140" y1="0" x2="1140" y2="630"/>
+    <line x1="0" y1="60" x2="1200" y2="60"/><line x1="0" y1="120" x2="1200" y2="120"/>
+    <line x1="0" y1="180" x2="1200" y2="180"/><line x1="0" y1="240" x2="1200" y2="240"/>
+    <line x1="0" y1="300" x2="1200" y2="300"/><line x1="0" y1="360" x2="1200" y2="360"/>
+    <line x1="0" y1="420" x2="1200" y2="420"/><line x1="0" y1="480" x2="1200" y2="480"/>
+    <line x1="0" y1="540" x2="1200" y2="540"/>
+  </g>
+
+  <!-- Diagonal racing stripes -->
+  <g opacity="0.03">
+    <line x1="700" y1="0" x2="1200" y2="400" stroke="#00E676" stroke-width="2"/>
+    <line x1="750" y1="0" x2="1200" y2="360" stroke="#00E676" stroke-width="2"/>
+    <line x1="800" y1="0" x2="1200" y2="320" stroke="#00E676" stroke-width="2"/>
+  </g>
+
+  <!-- Green glow center -->
+  <circle cx="600" cy="280" r="250" fill="#00E676" opacity="0.04" filter="url(#glow)"/>
+
+  <!-- Top accent line -->
+  <rect x="100" y="160" width="1000" height="2" fill="url(#line)" rx="1"/>
+
+  <!-- Logo text -->
+  <text x="600" y="270" text-anchor="middle" font-family="'Exo 2', sans-serif" font-weight="800" font-size="72" letter-spacing="-2" fill="url(#green)" filter="url(#glow)">MATRIX RACE</text>
+
+  <!-- Tagline -->
+  <text x="600" y="340" text-anchor="middle" font-family="'Inter', sans-serif" font-weight="500" font-size="28" fill="#F1F5F9">Palpites de F1 com Amigos</text>
+
+  <!-- Subtitle -->
+  <text x="600" y="390" text-anchor="middle" font-family="'Inter', sans-serif" font-weight="400" font-size="20" fill="#8892A8">Crie ligas, faça previsões e dispute quem é o expert da grid</text>
+
+  <!-- Bottom accent line -->
+  <rect x="100" y="440" width="1000" height="2" fill="url(#line)" rx="1"/>
+
+  <!-- Bottom badges -->
+  <g transform="translate(320, 480)">
+    <rect x="0" y="0" width="160" height="36" rx="8" fill="#00E676" fill-opacity="0.1" stroke="#00E676" stroke-opacity="0.2"/>
+    <text x="80" y="23" text-anchor="middle" font-family="'Exo 2', sans-serif" font-weight="700" font-size="13" fill="#00E676">100% GRATUITO</text>
+  </g>
+  <g transform="translate(520, 480)">
+    <rect x="0" y="0" width="160" height="36" rx="8" fill="#00E676" fill-opacity="0.1" stroke="#00E676" stroke-opacity="0.2"/>
+    <text x="80" y="23" text-anchor="middle" font-family="'Exo 2', sans-serif" font-weight="700" font-size="13" fill="#00E676">CORRIDAS AO VIVO</text>
+  </g>
+  <g transform="translate(720, 480)">
+    <rect x="0" y="0" width="160" height="36" rx="8" fill="#00E676" fill-opacity="0.1" stroke="#00E676" stroke-opacity="0.2"/>
+    <text x="80" y="23" text-anchor="middle" font-family="'Exo 2', sans-serif" font-weight="700" font-size="13" fill="#00E676">LIGAS ILIMITADAS</text>
+  </g>
+
+  <!-- URL -->
+  <text x="600" y="580" text-anchor="middle" font-family="'Inter', sans-serif" font-weight="500" font-size="16" fill="#8892A8" opacity="0.6">www.matrixrace.com</text>
+</svg>

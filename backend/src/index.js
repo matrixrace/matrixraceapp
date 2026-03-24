@@ -164,6 +164,12 @@ app.get('/index.html', (req, res) => {
   res.sendFile(path.join(publicPath, 'index.html'));
 });
 
+// Landing page (fora do Flutter, SEO-friendly)
+app.get('/', (req, res) => {
+  res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.sendFile(path.join(__dirname, '..', 'landing.html'));
+});
+
 // Pagina de importacao de resultados (fora do Flutter)
 app.get('/import', (req, res) => {
   res.set('Cache-Control', 'no-cache, no-store, must-revalidate');

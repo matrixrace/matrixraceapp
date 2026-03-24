@@ -61,6 +61,10 @@ class AppRouter {
             builder: (context, state) => const HomeScreen(),
           ),
           GoRoute(
+            path: '/home',
+            builder: (context, state) => const HomeScreen(),
+          ),
+          GoRoute(
             path: '/leagues',
             builder: (context, state) => const LeaguesScreen(),
           ),
