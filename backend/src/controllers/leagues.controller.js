@@ -730,6 +730,36 @@ async function leaveLeague(req, res, next) {
   }
 }
 
+// GET /api/v1/leagues/public-info/:code
+// Info pública de uma liga pelo código de convite (não requer autenticação)
+async function getLeagueByInviteCode(req, res, next) {
+  try {
+    const { code } = req.params;
+
+    const result = await pool.query(
+      `SELECT l.id, l.name, l.description, l.is_public, l.requires_approval, l.max_members,
+              u.display_name as owner_name,
+              COUNT(DISTINCT lm.user_id) as member_count
+       FROM leagues l
+       JOIN users u ON u.id = l.owner_id
+       LEFT JOIN league_members lm ON lm.league_id = l.id
+         AND lm.user_id NOT IN (SELECT id FROM users WHERE is_admin = true)
+         AND lm.status = 'active'
+       WHERE UPPER(l.invite_code) = $1
+       GROUP BY l.id, u.display_name`,
+      [code.toUpperCase()]
+    );
+
+    if (result.rows.length === 0) {
+      return next(errorResponse('Código de convite inválido', 404));
+    }
+
+    res.json(successResponse(result.rows[0]));
+  } catch (error) {
+    next(error);
+  }
+}
+
 module.exports = {
   getMyLeagues, getPublicLeagues, getLeague,
   createLeague, updateLeague, deleteLeague,
@@ -738,4 +768,5 @@ module.exports = {
   getPendingRequests, approveRequest, rejectRequest,
   getPublicLeaguesForPrediction,
   getLeagueRacesStatus,
+  getLeagueByInviteCode,
 };

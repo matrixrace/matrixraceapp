@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:share_plus/share_plus.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/app_bottom_nav.dart';
@@ -236,6 +238,33 @@ class _LeagueDetailScreenState extends State<LeagueDetailScreen>
     );
   }
 
+  Future<void> _shareLeague() async {
+    final league = _league;
+    if (league == null) return;
+
+    final inviteCode = league['invite_code'] ?? league['inviteCode'];
+    if (inviteCode == null) return;
+
+    final shareUrl = 'https://www.matrixrace.com/join/$inviteCode';
+    final leagueName = league['name'] ?? 'Liga';
+
+    try {
+      await SharePlus.instance.share(
+        ShareParams(
+          text: 'Entre na liga "$leagueName" no Matrix Race!\n$shareUrl',
+        ),
+      );
+    } catch (_) {
+      // Fallback: copia o link para a área de transferência
+      await Clipboard.setData(ClipboardData(text: shareUrl));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Link copiado!'), backgroundColor: Colors.green),
+        );
+      }
+    }
+  }
+
   Widget _buildJoinView() {
     final league = _league;
     if (league == null) return const SizedBox.shrink();
@@ -380,6 +409,12 @@ class _LeagueDetailScreenState extends State<LeagueDetailScreen>
           ],
         ),
         actions: [
+          if (_isMember)
+            IconButton(
+              icon: const Icon(Icons.share_outlined),
+              tooltip: 'Compartilhar liga',
+              onPressed: _shareLeague,
+            ),
           if (_isOwner)
             PopupMenuButton<String>(
               icon: const Icon(Icons.settings_outlined),

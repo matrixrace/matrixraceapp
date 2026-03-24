@@ -23,6 +23,7 @@ import '../features/admin/presentation/screens/admin_user_leagues_screen.dart';
 import '../features/how_it_works/presentation/screens/how_it_works_screen.dart';
 import '../features/live/presentation/screens/live_screen.dart';
 import '../features/news/presentation/screens/news_screen.dart';
+import '../features/leagues/presentation/screens/join_league_screen.dart';
 
 /// Configuração de rotas do app
 class AppRouter {
@@ -157,6 +158,12 @@ class AppRouter {
       GoRoute(
         path: '/how-it-works',
         builder: (context, state) => const HowItWorksScreen(),
+      ),
+      GoRoute(
+        path: '/join/:code',
+        builder: (context, state) => JoinLeagueScreen(
+          code: state.pathParameters['code']!,
+        ),
       ),
       GoRoute(
         path: '/users/:userId',

@@ -9,6 +9,7 @@ import '../tutorial/tutorial_bloc.dart';
 import '../tutorial/tutorial_step.dart';
 import '../tutorial/tutorial_overlay.dart';
 import '../../features/auth/presentation/bloc/auth_bloc.dart';
+import '../services/pending_redirect_service.dart';
 
 /// Shell compartilhado entre as telas principais.
 /// Fornece AppBar consistente, BottomNavigationBar e TutorialOverlay.
@@ -32,6 +33,22 @@ class _MainShellState extends State<MainShell> {
     _loadNotificationCount();
     _checkAdmin();
     _showWelcomeIfNeeded();
+    _checkPendingRedirect();
+  }
+
+  /// Verifica se há um redirect pendente (ex: link de convite de liga).
+  /// Cobre o caso do Google Sign-In que recarrega a página inteira.
+  Future<void> _checkPendingRedirect() async {
+    final pendingUrl = await PendingRedirectService.consumeRedirect();
+    if (pendingUrl != null && mounted) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        final authState = context.read<AuthBloc>().state;
+        if (authState is AuthAuthenticated) {
+          context.go(pendingUrl);
+        }
+      });
+    }
   }
 
   Future<void> _loadNotificationCount() async {

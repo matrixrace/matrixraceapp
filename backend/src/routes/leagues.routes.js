@@ -7,6 +7,7 @@ const {
   getPendingRequests, approveRequest, rejectRequest,
   getPublicLeaguesForPrediction,
   getLeagueRacesStatus,
+  getLeagueByInviteCode,
 } = require('../controllers/leagues.controller');
 const {
   getLeagueMessages,
@@ -35,6 +36,7 @@ const router = Router();
 
 // Rotas públicas
 router.get('/public', optionalAuth, getPublicLeagues);
+router.get('/public-info/:code', getLeagueByInviteCode);
 
 // Rotas autenticadas
 router.get('/', authenticate, getMyLeagues);

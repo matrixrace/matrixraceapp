@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/services/pending_redirect_service.dart';
 import '../bloc/auth_bloc.dart';
 
 /// Tela de Login — Matrix Race
@@ -70,9 +71,10 @@ class _LoginScreenState extends State<LoginScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       body: BlocListener<AuthBloc, AuthState>(
-        listener: (context, state) {
+        listener: (context, state) async {
           if (state is AuthAuthenticated) {
-            context.go('/');
+            final pendingUrl = await PendingRedirectService.consumeRedirect();
+            if (mounted) context.go(pendingUrl ?? '/');
           } else if (state is AuthError) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(content: Text(state.message)),
