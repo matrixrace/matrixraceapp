@@ -238,15 +238,16 @@
       box-shadow: var(--glow);
     }
 
-    /* Hamburger (CSS-only) */
-    .hamburger-toggle { display: none; }
+    /* Hamburger button */
     .hamburger {
       display: flex;
       flex-direction: column;
       gap: 5px;
       cursor: pointer;
-      z-index: 110;
+      z-index: 10001;
       padding: 4px;
+      background: none;
+      border: none;
     }
     .hamburger span {
       display: block;
@@ -256,11 +257,11 @@
       border-radius: 2px;
       transition: all 0.3s;
     }
-    .hamburger-toggle:checked ~ .hamburger span:nth-child(1) {
+    .hamburger.active span:nth-child(1) {
       transform: rotate(45deg) translate(5px, 5px);
     }
-    .hamburger-toggle:checked ~ .hamburger span:nth-child(2) { opacity: 0; }
-    .hamburger-toggle:checked ~ .hamburger span:nth-child(3) {
+    .hamburger.active span:nth-child(2) { opacity: 0; }
+    .hamburger.active span:nth-child(3) {
       transform: rotate(-45deg) translate(5px, -5px);
     }
 
@@ -272,11 +273,13 @@
       left: 0;
       right: 0;
       bottom: 0;
+      width: 100vw;
+      height: 100vh;
       background: #080B12;
       padding: 100px 24px 40px;
       z-index: 9999;
     }
-    .hamburger-toggle:checked ~ .mobile-menu { display: flex; flex-direction: column; gap: 24px; }
+    .mobile-menu.open { display: flex; flex-direction: column; gap: 24px; }
     .mobile-menu a {
       font-family: var(--font-display);
       font-size: 20px;
@@ -296,7 +299,7 @@
 
     @media (min-width: 768px) {
       .nav-links { display: flex; }
-      .hamburger, .hamburger-toggle { display: none !important; }
+      .hamburger { display: none !important; }
       .mobile-menu { display: none !important; }
     }
 
@@ -1208,18 +1211,19 @@
       </nav>
 
       <!-- Mobile hamburger -->
-      <input type="checkbox" id="ham" class="hamburger-toggle" aria-label="Menu">
-      <label for="ham" class="hamburger" aria-label="Abrir menu">
+      <button id="ham-btn" class="hamburger" aria-label="Abrir menu" onclick="toggleMobileMenu()">
         <span></span><span></span><span></span>
-      </label>
-      <div class="mobile-menu">
-        <a href="#funcionalidades" onclick="document.getElementById('ham').checked=false">Funcionalidades</a>
-        <a href="#como-funciona" onclick="document.getElementById('ham').checked=false">Como Funciona</a>
-        <a href="#screenshots" onclick="document.getElementById('ham').checked=false">Screenshots</a>
-        <a href="/login" class="btn-enter">Entrar</a>
-      </div>
+      </button>
     </div>
   </header>
+
+  <!-- Mobile menu (fora do header para evitar backdrop-filter containing block) -->
+  <div id="mobile-menu" class="mobile-menu">
+    <a href="#funcionalidades" onclick="closeMobileMenu()">Funcionalidades</a>
+    <a href="#como-funciona" onclick="closeMobileMenu()">Como Funciona</a>
+    <a href="#screenshots" onclick="closeMobileMenu()">Screenshots</a>
+    <a href="/login" class="btn-enter">Entrar</a>
+  </div>
 
   <!-- ════ Hero ════ -->
   <section class="hero">
@@ -1713,12 +1717,19 @@
 
     reveals.forEach(function(el) { observer.observe(el); });
 
-    // Close mobile menu on anchor click
-    document.querySelectorAll('.mobile-menu a[href^="#"]').forEach(function(a) {
-      a.addEventListener('click', function() {
-        document.getElementById('ham').checked = false;
-      });
-    });
+    // Mobile menu toggle
+    function toggleMobileMenu() {
+      var menu = document.getElementById('mobile-menu');
+      var btn = document.getElementById('ham-btn');
+      var isOpen = menu.classList.toggle('open');
+      btn.classList.toggle('active', isOpen);
+      document.body.style.overflow = isOpen ? 'hidden' : '';
+    }
+    function closeMobileMenu() {
+      document.getElementById('mobile-menu').classList.remove('open');
+      document.getElementById('ham-btn').classList.remove('active');
+      document.body.style.overflow = '';
+    }
   </script>
 </body>
 </html>
