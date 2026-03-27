@@ -5,12 +5,16 @@ const logger = require('./logger');
 
 // Lista de feeds RSS de portais F1
 const RSS_FEEDS = [
-  { name: 'Formula 1 Official', url: 'https://www.formula1.com/content/fom-website/en/latest/all.xml' },
   { name: 'Motorsport.com', url: 'https://www.motorsport.com/rss/f1/news/' },
   { name: 'Autosport', url: 'https://www.autosport.com/rss/f1/news/' },
-  { name: 'RaceFans', url: 'https://www.racefans.net/feed/' },
-  { name: 'PlanetF1', url: 'https://www.planetf1.com/feed/' },
-  { name: 'GPBlog', url: 'https://www.gpblog.com/en/rss/index.xml' },
+  { name: 'Formula 1 Official', url: 'https://www.formula1.com/en/latest/all.xml' },
+  { name: 'BBC F1', url: 'https://feeds.bbci.co.uk/sport/formula1/rss.xml' },
+  { name: 'ESPN F1', url: 'https://www.espn.com/espn/rss/f1/news' },
+  { name: 'Sky Sports F1', url: 'https://www.skysports.com/rss/12040' },
+  { name: 'The Race', url: 'https://www.the-race.com/rss/' },
+  { name: 'GPFans', url: 'https://www.gpfans.com/en/rss.xml' },
+  { name: 'F1i', url: 'https://f1i.com/feed' },
+  { name: 'Pitpass', url: 'https://www.pitpass.com/fes_php/fes_usr_sit_newsfeed.php?fes_prepession_link=rss' },
 ];
 
 const parser = new XMLParser({
